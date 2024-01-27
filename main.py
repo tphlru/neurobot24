@@ -19,7 +19,7 @@ hyps = []  # list to save hypotheses to the center
 sizes = {}
 
 
-image = cv2.imread("rect4.png")  # photo4.jpg rect4.png
+image = cv2.imread("rect5.png")  # photo4.jpg rect4.png
 height, width = image.shape[:2]
 
 
@@ -171,9 +171,6 @@ kernel = np.ones((3, 3), np.uint8)
 mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2)
 mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=4)
 
-cv2.imwrite("output2.jpg", mask_blue)
-
-
 rows = mask_blue.shape[0]
 circles = cv2.HoughCircles(
     mask_blue,
@@ -183,7 +180,7 @@ circles = cv2.HoughCircles(
     param1=1000,
     param2=6,
     minRadius=round(sizes["square"][0] / 5),
-    maxRadius=sizes["square"][0],
+    maxRadius=round(sizes["square"][0] / 2),
 )
 
 # print(circles)
@@ -204,43 +201,58 @@ for i, coord in enumerate(coordinates["aim_center"]):
     h = get_dist_to_center(
         coord[0] - coordinates["center"][0], coord[1] - coordinates["center"][1]
     )
-    h = myround(h, 25)
+    h = myround(h, 75)
     hyps.append([i, h])
+
 
 hyps.sort(key=lambda x: x[1])  # sort by hyp value
 
-# find same values
-for i in range(len(hyps) - 1):
-    if hyps[i][1] == hyps[i + 1][1]:
-        # indexes
-        a = hyps[i][0]
-        b = hyps[i + 1][0]
 
-        # coordinates['aim_center'][a][0] or coordinates['aim_center'][b][0] is greater
-        if coordinates["aim_center"][a][0] > coordinates["aim_center"][b][0]:
-            a, b = b, a
-            hyps[i], hyps[i + 1] = hyps[i + 1], hyps[i]
+# create a dictionary to store indices of elements with the same value
+same_values = {}
 
-        print(
-            "X coord first:",
-            coordinates["aim_center"][a][0],
-            "   X coord second:",
-            coordinates["aim_center"][b][0],
-        )
+# populate the dictionary
+for index, value in hyps:
+    if value not in same_values:
+        same_values[value] = []
+    same_values[value].append(index)
 
-print(hyps)
+# looks like:  {475: [1, 2], 625: [0]}
+print("sames", same_values)
+
+# iterate over the sorted hyps list
+for sames in same_values.values():
+    if len(sames) > 1:
+        sorted_sames = sorted(sames, key=lambda x: coordinates["aim_center"][x][0])
+
+sorted_hyps = [sublist[0] for sublist in hyps]
+print("sorted_sames", sorted_sames)
+print("sorted_hyps", sorted_hyps)
+
+samesstr = "".join(str(x) for x in sorted_sames)
+hypstr = "".join(str(x) for x in sorted_hyps)
+
+least_index = min(hypstr.index(str(val)) for val in sorted_sames)
+print("least_index", least_index)
+
+for i in range(least_index, len(sorted_sames)):
+    print("change", hypstr[i], "to", samesstr[i])
+    sorted_hyps[i] = int(samesstr[i])
+
+print("sorted_hyps", sorted_hyps)
+
 # put text num
-for i in range(len(hyps)):
+for i in range(len(sorted_hyps)):
     cv2.putText(
         img,
-        str(i),
+        str(i),  # text
         (
-            coordinates["aim_center"][hyps[i][0]][0],
-            coordinates["aim_center"][hyps[i][0]][1] - 20,
+            coordinates["aim_center"][sorted_hyps[i]][0],
+            coordinates["aim_center"][sorted_hyps[i]][1] - 20,
         ),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1,
-        (0, 255, 0),
-        2,
+        cv2.FONT_HERSHEY_SCRIPT_COMPLEX,  # font (handwriting)
+        1.3,  # font scale
+        (0, 255, 0),  # font color
+        2,  # text thickness
     )
 cv2.imwrite("output2.jpg", img)
