@@ -1,9 +1,5 @@
-black
 certifi
-mypy==1.8.0
-numpy==1.24.3
+numpy
 opencv-python
 pillow
 scikit-image
-opencv-stubs==0.0.8
-urllib3==2.2.0
