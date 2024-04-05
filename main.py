@@ -11,6 +11,9 @@ planewidth = 1200
 planeheight = 800
 dist_to_plane = 2200
 min_accur = 50
+cal_k = float(input("Enter cal_k")) #1.0
+pix_k = 0
+size_plus = 15
 
 cross2squareK: float = 20 / 15  # 20 / 15
 
@@ -34,10 +37,10 @@ def show(simg):
 # read frame from cam
 cam = cv2.VideoCapture(0)
 # set cam params
-cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-_, frame = cam.read()
-cam.release()
+# cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+# cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+# ret, frame = cam.read()
+# cam.release()
 
 image = cv2.imread("rect5.png")  # photo4.jpg rect4.png
 # image = frame
@@ -159,6 +162,18 @@ cv2.rectangle(
 
 print("Width of the plus: ", sizes["plus"][0])
 print("Height of the plus: ", sizes["plus"][1])
+pix_k = size_plus / ((sizes["plus"][0] + sizes["plus"][1]) / 2)
+print("cm in 1 pix (pix_k): ", pix_k)
+
+if "y" in input("Калибровать y/n"):
+    dist_to_cal = float(input("Введите расстояние до калибровачной плокости в см, в формате xx.x"))
+    cal_k = dist_to_cal / ((sizes["plus"][0] + sizes["plus"][1]) / 2)
+    print("Калибровачный коэффицент =", cal_k)
+    input("Send any to continue ...")
+    # TODO
+else: # мы видим настоящий плюсик
+    dist_to_plane = cal_k * ((sizes["plus"][0] + sizes["plus"][1]) / 2)
+    print("Расстояние до рабочей плоскости =", dist_to_plane)
 
 sizes["square"] = (
     int(sizes["plus"][0] * cross2squareK),
@@ -172,7 +187,6 @@ sizes["plane"] = (sizes["square"][0] * 6, sizes["square"][1] * 4)
 
 print("Width of the plane: ", sizes["plane"][0])
 print("Height of the plane: ", sizes["plane"][1])
-
 show(img)
 
 # crop img by plane sizes
@@ -281,8 +295,27 @@ for i in range(len(sorted_hyps)):
         2,  # text thickness
     )
 
+
+centerd_coordinates = []
+for i in range(len(sorted_hyps)):
+    kX = 1 / sizes["plane"][0]
+    kY = 1 / sizes["plane"][1]
+
+    centeredX = (sizes["plane"][0] / 2) - coordinates["aim_center"][sorted_hyps[i]][0]
+    centeredX = centeredX * kX * (-1)
+    centeredX = centeredX * planewidth
+    centeredX = centeredX * pix_k
+
+    centeredY = (sizes["plane"][1] / 2) - coordinates["aim_center"][sorted_hyps[i]][1]
+    centeredY = centeredY * kY
+    centeredY = centeredY * planeheight
+    centeredY = centeredY * pix_k
+
+    centerd_coordinates.append([centeredX, centeredY])
+
+print(centerd_coordinates)
 # cv2.imwrite("output2.jpg", img)
-# imshow with halfwindow size
-cv2.imshow("image", cv2.resize(img, (width // 3, height // 3)))
+#imshow with halfwindow size
+cv2.imshow("image", cv2.resize(img, (width//3, height//3)))
 cv2.waitKey()
 cv2.destroyAllWindows()
