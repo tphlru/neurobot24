@@ -67,6 +67,7 @@ def myround(x, base=5):
 
 
 # Init cascade
+# sourcery skip: remove-unnecessary-else, swap-if-else-branches
 cascade = cv2.CascadeClassifier()
 cascade.load("cascade.xml")  # load cascade
 
@@ -84,19 +85,19 @@ print(f"Found {len(detected_rects)} objects using haar cascade!")
 
 # Get the nearest to the real center rect and save it to 'haar_rect'
 haar_rect = {"i": 0, "val": 100000, "center": (0, 0), "wh": (0, 0)}
+
 for i, (dX, dY, dW, dH) in enumerate(detected_rects):
-    # draw the face bounding box on the frame
+    # Draw the face bounding box on the frame
     cv2.rectangle(img, (dX, dY), (dX + dW, dY + dH), (30, 200, 230), 2)
 
+    # Calculate the center of the rectangle
     plus_center = (dX + dW // 2, dY + dH // 2)
 
-    # check if new center is closer to the real center than previous one
-    if haar_rect["val"] > sqrt(
-            (dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2
-    ):
-        haar_rect["val"] = sqrt(
-            (dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2
-        )
+    # Check if new center is closer to the real center than previous one
+    distance = sqrt((dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2)
+    if haar_rect["val"] > distance:
+        # Update the haar_rect dictionary with the new closest rectangle's information
+        haar_rect["val"] = distance
         haar_rect["center"] = plus_center
         haar_rect["wh"] = (dW, dH)
         haar_rect["i"] = i
@@ -110,10 +111,10 @@ print(f"Found {len(contours)} objects using contours!")
 contours.sort(key=cv2.contourArea)
 for cnt in contours:
     M = cv2.moments(cnt)
-    try:
+    if M["m00"] != 0:
         cX = int(M["m10"] / M["m00"])  # get center X
         cY = int(M["m01"] / M["m00"])  # get center Y
-    except ZeroDivisionError:
+    else:
         continue
     cnt_center = [cX, cY]
 
@@ -175,19 +176,20 @@ print("Height of the plane: ", sizes["plane"][1])
 show(img)
 
 # crop img by plane sizes
-img = img[
-      coordinates["center"][1] - sizes["plane"][1] // 2: coordinates["center"][1]
-                                                         + sizes["plane"][1] // 2,
-      coordinates["center"][0] - sizes["plane"][0] // 2: coordinates["center"][0]
-                                                         + sizes["plane"][0] // 2,
-      ]
+center_y = coordinates["center"][1]
+center_x = coordinates["center"][0]
+plane_y = sizes["plane"][1]
+plane_x = sizes["plane"][0]
 
-mask_blue = mask_blue[
-            coordinates["center"][1] - sizes["plane"][1] // 2: coordinates["center"][1]
-                                                               + sizes["plane"][1] // 2,
-            coordinates["center"][0] - sizes["plane"][0] // 2: coordinates["center"][0]
-                                                               + sizes["plane"][0] // 2,
-            ]
+img = (img[
+       center_y - plane_y // 2: center_y + plane_y // 2,
+       center_x - plane_x // 2: center_x + plane_x // 2,
+       ])
+
+mask_blue = (mask_blue[
+             center_y - plane_y // 2: center_y + plane_y // 2,
+             center_x - plane_x // 2: center_x + plane_x // 2,
+             ])
 
 # recalculate center coordinates
 coordinates["center"][0] = sizes["plane"][0] / 2
