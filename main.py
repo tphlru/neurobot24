@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from tools.filters import bright_contrast, histogram_adp
-from tools.processtool import get_dist_to_center, mask_by_color, mask_center
+from tools.processtool import get_dist_to_center, mask_by_color, mask_center, invert
 
 # сonstants
 planewidth = 1200
@@ -14,12 +14,19 @@ min_accur = 50
 
 cross2squareK: float = 20 / 15  # 20 / 15
 
+color_ranges = {
+    "white": [(0, 0, 90), (255, 153, 255)],
+    "red": [[(0, 50, 50), (50, 255, 255)], [(140, 50, 50), (200, 255, 255)]],
+    "blue": [(85, 210, 30), (185, 255, 255)],
+}
+
 coordinates = {"aim_center": []}
 hyps: list = []  # list to save hypotheses to the center
 sizes = {}
 
-def show(img):
-    cv2.imshow("image", img)
+
+def show(simg):
+    cv2.imshow("image", simg)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -32,31 +39,25 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 _, frame = cam.read()
 cam.release()
 
-
 image = cv2.imread("rect5.png")  # photo4.jpg rect4.png
 # image = frame
 height, width = image.shape[:2]
 
-
+# FILTERS
 img = histogram_adp(image)  # adaptive histogram equalization
 img = bright_contrast(img, -10, 30)  # brightness and contrast
 
+# IMAGE PROCESSING
+mask_white = invert(mask_by_color(img, color_ranges['white']))  # Shades of white (and invert)
+img[mask_white == 0] = (255, 255, 255)  # (apply mask) Now true white
 
+mask_red = mask_by_color(img, color_ranges['red'])  # Shades of red and pink
+mask_blue = mask_by_color(img, color_ranges['blue'])  # Shades of blue
 
-# color masks
-mask_white = 255-mask_by_color(img, [(0, 0, 90), (255, 153, 255)])
-# apply white mask - fill with white where mask
-img[mask_white == 0] = (255, 255, 255)
+center_mask = mask_center(mask_red, divk=2)  # Create center mask (half of wd and half of ht)
+center_mask = cv2.cvtColor(center_mask, cv2.COLOR_BGR2GRAY)  # Convert center mask to grayscale
 
-mask_red = mask_by_color(
-    img, [(0, 50, 50), (50, 255, 255)], [(140, 50, 50), (200, 255, 255)]
-)
-mask_blue = mask_by_color(img, [(85, 210, 30), (185, 255, 255)])
-
-center_mask = mask_center(mask_red, divk=2)  # create center mask
-center_mask = cv2.cvtColor(center_mask, cv2.COLOR_BGR2GRAY)  # convert mask to grayscale
-
-img_center_only = 255-cv2.bitwise_and(mask_red, center_mask)  # apply center mask
+img_center_only = invert(cv2.bitwise_and(mask_red, center_mask))  # Apply center mask and invert
 
 show(img_center_only)
 
@@ -81,7 +82,6 @@ detected_rects = cascade.detectMultiScale(
 
 print(f"Found {len(detected_rects)} objects using haar cascade!")
 
-
 # Get the nearest to the real center rect and save it to 'haar_rect'
 haar_rect = {"i": 0, "val": 100000, "center": (0, 0), "wh": (0, 0)}
 for i, (dX, dY, dW, dH) in enumerate(detected_rects):
@@ -92,7 +92,7 @@ for i, (dX, dY, dW, dH) in enumerate(detected_rects):
 
     # check if new center is closer to the real center than previous one
     if haar_rect["val"] > sqrt(
-        (dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2
+            (dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2
     ):
         haar_rect["val"] = sqrt(
             (dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2
@@ -100,7 +100,6 @@ for i, (dX, dY, dW, dH) in enumerate(detected_rects):
         haar_rect["center"] = plus_center
         haar_rect["wh"] = (dW, dH)
         haar_rect["i"] = i
-
 
 contours, _ = cv2.findContours(
     255 - img_center_only, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -175,22 +174,20 @@ print("Height of the plane: ", sizes["plane"][1])
 
 show(img)
 
-
 # crop img by plane sizes
 img = img[
-    coordinates["center"][1] - sizes["plane"][1] // 2 : coordinates["center"][1]
-    + sizes["plane"][1] // 2,
-    coordinates["center"][0] - sizes["plane"][0] // 2 : coordinates["center"][0]
-    + sizes["plane"][0] // 2,
-]
+      coordinates["center"][1] - sizes["plane"][1] // 2: coordinates["center"][1]
+                                                         + sizes["plane"][1] // 2,
+      coordinates["center"][0] - sizes["plane"][0] // 2: coordinates["center"][0]
+                                                         + sizes["plane"][0] // 2,
+      ]
 
 mask_blue = mask_blue[
-    coordinates["center"][1] - sizes["plane"][1] // 2 : coordinates["center"][1]
-    + sizes["plane"][1] // 2,
-    coordinates["center"][0] - sizes["plane"][0] // 2 : coordinates["center"][0]
-    + sizes["plane"][0] // 2,
-]
-
+            coordinates["center"][1] - sizes["plane"][1] // 2: coordinates["center"][1]
+                                                               + sizes["plane"][1] // 2,
+            coordinates["center"][0] - sizes["plane"][0] // 2: coordinates["center"][0]
+                                                               + sizes["plane"][0] // 2,
+            ]
 
 # recalculate center coordinates
 coordinates["center"][0] = sizes["plane"][0] / 2
@@ -214,7 +211,6 @@ circles = cv2.HoughCircles(
 
 print("Circles: ", circles)
 
-
 res = np.zeros(img.shape)
 if circles is not None:
     circles = np.uint16(np.around(circles))
@@ -226,7 +222,6 @@ if circles is not None:
         radius = i[2]
         cv2.circle(img, center, radius, (255, 0, 255), 3)
 
-
 for i, coord in enumerate(coordinates["aim_center"]):
     h = get_dist_to_center(
         coord[0] - coordinates["center"][0], coord[1] - coordinates["center"][1]
@@ -234,9 +229,7 @@ for i, coord in enumerate(coordinates["aim_center"]):
     h = myround(h, 75)
     hyps.append([i, h])
 
-
 hyps.sort(key=lambda x: x[1])  # sort by hyp value
-
 
 # create a dictionary to store indices of elements with the same value
 same_values = {}
@@ -277,17 +270,17 @@ for i in range(len(sorted_hyps)):
         img,
         str(i),  # text
         (
-            coordinates["aim_center"][sorted_hyps[i]][0], # X coordinate
-            coordinates["aim_center"][sorted_hyps[i]][1] - 20, # Y coordinate
+            coordinates["aim_center"][sorted_hyps[i]][0],  # X coordinate
+            coordinates["aim_center"][sorted_hyps[i]][1] - 20,  # Y coordinate
         ),
         cv2.FONT_HERSHEY_SCRIPT_COMPLEX,  # font (handwriting)
         1.3,  # font scale
         (0, 255, 0),  # font color
         2,  # text thickness
     )
-    
+
 # cv2.imwrite("output2.jpg", img)
-#imshow with halfwindow size
-cv2.imshow("image", cv2.resize(img, (width//3, height//3)))
+# imshow with halfwindow size
+cv2.imshow("image", cv2.resize(img, (width // 3, height // 3)))
 cv2.waitKey()
 cv2.destroyAllWindows()
