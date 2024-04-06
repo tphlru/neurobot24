@@ -10,12 +10,12 @@ from tools.processtool import get_dist_to_center, mask_by_color, mask_center, in
 planewidth = 118
 planeheight = 77
 dist_to_plane = 2200
-min_accur = 30
+min_accur = 15
 cal_k = float(input("Enter cal_k") or 0.25)  # 1.0
 pix_k = 0
-size_plus = 15
+size_plus = 10
 
-cross2squareK: float = 20 / 17  # 20 / 15
+cross2squareK: float = 21 / 17  # 20 / 15
 
 color_ranges = {
     "white": [(0, 0, 90), (255, 153, 255)],
@@ -42,13 +42,17 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 ret, frame = cam.read()
 cam.release()
 
-image = cv2.imread("rect5.png")  # photo4.jpg rect4.png
+# image = cv2.imread("rect5.png")  # photo4.jpg rect4.png
 image = frame
 height, width = image.shape[:2]
+show(image)
 
 # FILTERS
 img = histogram_adp(image)  # adaptive histogram equalization
-img = bright_contrast(img, -10, 30)  # brightness and contrast
+show(img)
+
+img = bright_contrast(img, 0, 25)  # brightness and contrast
+show(img)
 
 # IMAGE PROCESSING
 mask_white = invert(mask_by_color(img, color_ranges['white']))  # Shades of white (and invert)
@@ -79,7 +83,7 @@ detected_rects = cascade.detectMultiScale(
     img_center_only,
     scaleFactor=1.8,
     minNeighbors=6,
-    minSize=(100, 100),
+    minSize=(40, 40),
     maxSize=(200, 200),
     flags=cv2.CASCADE_SCALE_IMAGE,
 )
@@ -171,12 +175,12 @@ print("cm in 1 pix (pix_k): ", pix_k)
 
 if "y" in input("Калибровать y/n"):
     dist_to_cal = float(input("Введите расстояние до калибровачной плокости в см, в формате xx.x"))
-    cal_k = dist_to_cal / ((sizes["plus"][0] + sizes["plus"][1]) / 2)
+    cal_k = ((sizes["plus"][0] + sizes["plus"][1]) / 2) * dist_to_cal
     print("Калибровачный коэффицент =", cal_k)
     input("Send any to continue ...")
     # TODO
 else:  # мы видим настоящий плюсик
-    dist_to_plane = cal_k * ((sizes["plus"][0] + sizes["plus"][1]) / 2)
+    dist_to_plane = cal_k / ((sizes["plus"][0] + sizes["plus"][1]) / 2)
     print("Расстояние до рабочей плоскости =", dist_to_plane)
 
 sizes["square"] = (
@@ -216,17 +220,17 @@ coordinates["center"][1] = sizes["plane"][1] / 2
 kernel = np.ones((3, 3), np.uint8)
 mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2)
 mask_blue = cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=4)
-
+show(mask_blue)
 rows = mask_blue.shape[0]
 circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
     1,
     sizes["square"][0],
-    param1=1300,
-    param2=9,
-    minRadius=round(sizes["square"][0] / 5.25),
-    maxRadius=round(sizes["square"][0] / 2.5),
+    param1=1500,
+    param2=7,
+    minRadius=round(sizes["square"][0] / 5),
+    maxRadius=round(sizes["square"][0] / 2.25),
 )
 
 print("Circles: ", circles)
@@ -263,6 +267,7 @@ for index, value in hyps:
 print("sames", same_values)
 
 # iterate over the sorted hyps list
+sorted_sames = []
 for sames in same_values.values():
     if len(sames) > 1:
         sorted_sames = sorted(sames, key=lambda x: coordinates["aim_center"][x][0])
