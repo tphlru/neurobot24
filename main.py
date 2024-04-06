@@ -7,15 +7,15 @@ from tools.filters import bright_contrast, histogram_adp
 from tools.processtool import get_dist_to_center, mask_by_color, mask_center, invert
 
 # сonstants
-planewidth = 1200
-planeheight = 800
+planewidth = 118
+planeheight = 77
 dist_to_plane = 2200
-min_accur = 50
-cal_k = float(input("Enter cal_k")) #1.0
+min_accur = 30
+cal_k = float(input("Enter cal_k") or 0.25)  # 1.0
 pix_k = 0
 size_plus = 15
 
-cross2squareK: float = 20 / 15  # 20 / 15
+cross2squareK: float = 20 / 17  # 20 / 15
 
 color_ranges = {
     "white": [(0, 0, 90), (255, 153, 255)],
@@ -37,13 +37,13 @@ def show(simg):
 # read frame from cam
 cam = cv2.VideoCapture(0)
 # set cam params
-# cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-# cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-# ret, frame = cam.read()
-# cam.release()
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+ret, frame = cam.read()
+cam.release()
 
 image = cv2.imread("rect5.png")  # photo4.jpg rect4.png
-# image = frame
+image = frame
 height, width = image.shape[:2]
 
 # FILTERS
@@ -78,9 +78,9 @@ cascade.load("cascade.xml")  # load cascade
 detected_rects = cascade.detectMultiScale(
     img_center_only,
     scaleFactor=1.8,
-    minNeighbors=5,
-    minSize=(50, 50),
-    maxSize=(150, 150),
+    minNeighbors=6,
+    minSize=(100, 100),
+    maxSize=(200, 200),
     flags=cv2.CASCADE_SCALE_IMAGE,
 )
 
@@ -111,7 +111,11 @@ contours, _ = cv2.findContours(
 # conv to list
 contours = list(contours)
 print(f"Found {len(contours)} objects using contours!")
-contours.sort(key=cv2.contourArea)
+# show(cv2.drawContours(image, contours, -1, (0, 255, 0), 3))
+
+contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+# print("conts", [cv2.contourArea(c) for c in contours])
+
 for cnt in contours:
     M = cv2.moments(cnt)
     if M["m00"] != 0:
@@ -171,7 +175,7 @@ if "y" in input("Калибровать y/n"):
     print("Калибровачный коэффицент =", cal_k)
     input("Send any to continue ...")
     # TODO
-else: # мы видим настоящий плюсик
+else:  # мы видим настоящий плюсик
     dist_to_plane = cal_k * ((sizes["plus"][0] + sizes["plus"][1]) / 2)
     print("Расстояние до рабочей плоскости =", dist_to_plane)
 
@@ -218,11 +222,11 @@ circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
     1,
-    rows / 8,
-    param1=1000,
-    param2=6,
-    minRadius=round(sizes["square"][0] / 6),
-    maxRadius=round(sizes["square"][0] / 2),
+    sizes["square"][0],
+    param1=1300,
+    param2=9,
+    minRadius=round(sizes["square"][0] / 5.25),
+    maxRadius=round(sizes["square"][0] / 2.5),
 )
 
 print("Circles: ", circles)
@@ -231,7 +235,6 @@ res = np.zeros(img.shape)
 if circles is not None:
     circles = np.uint16(np.around(circles))
     for i in circles[0, :]:
-        center = (i[0], i[1])
         center = (i[0], i[1])
         coordinates["aim_center"].append([i[0], i[1]])
         cv2.circle(img, center, 4, (0, 255, 0), 6)
@@ -295,7 +298,6 @@ for i in range(len(sorted_hyps)):
         2,  # text thickness
     )
 
-
 centerd_coordinates = []
 for i in range(len(sorted_hyps)):
     kX = 1 / sizes["plane"][0]
@@ -304,18 +306,18 @@ for i in range(len(sorted_hyps)):
     centeredX = (sizes["plane"][0] / 2) - coordinates["aim_center"][sorted_hyps[i]][0]
     centeredX = centeredX * kX * (-1)
     centeredX = centeredX * planewidth
-    centeredX = centeredX * pix_k
+    centeredX = centeredX * pix_k * 0.5
 
     centeredY = (sizes["plane"][1] / 2) - coordinates["aim_center"][sorted_hyps[i]][1]
     centeredY = centeredY * kY
     centeredY = centeredY * planeheight
-    centeredY = centeredY * pix_k
+    centeredY = centeredY * pix_k * 0.5
 
     centerd_coordinates.append([centeredX, centeredY])
 
 print(centerd_coordinates)
 # cv2.imwrite("output2.jpg", img)
-#imshow with halfwindow size
-cv2.imshow("image", cv2.resize(img, (width//3, height//3)))
+# imshow with halfwindow size
+cv2.imshow("image", cv2.resize(img, (width // 3, height // 3)))
 cv2.waitKey()
 cv2.destroyAllWindows()
