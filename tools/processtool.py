@@ -59,7 +59,7 @@ def mask_center(img, wd=None, ht=None, divk=2):
     """
     ih, iw = img.shape[:2]
     cmask = np.zeros((ih, iw, 3), dtype=np.uint8)
-    
+
     if wd is not None and ht is not None:
         divk = None
         center_area_height = ht
@@ -67,15 +67,15 @@ def mask_center(img, wd=None, ht=None, divk=2):
     else:
         center_area_height = ih // divk
         center_area_width = iw // divk
-    
+
     top_offset = (ih - center_area_height) // 2
     left_offset = (iw - center_area_width) // 2
-    
+
     cmask[
-    slice(top_offset, top_offset + center_area_height),
-    slice(left_offset, left_offset + center_area_width),
+        slice(top_offset, top_offset + center_area_height),
+        slice(left_offset, left_offset + center_area_width),
     ] = (255, 255, 255)
-    
+
     return cmask
 
 
