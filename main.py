@@ -7,6 +7,9 @@ from tools.filters import bright_contrast, histogram_adp
 from tools.processtool import get_dist_to_center, mask_by_color, mask_center, invert
 from os import environ
 
+from skimage.filters import threshold_yen
+from skimage.exposure import rescale_intensity
+
 # сonstants
 planewidth = 260
 planeheight = 170
@@ -53,7 +56,8 @@ show(image)
 img = histogram_adp(image)  # adaptive histogram equalization
 # show(img)
 
-img = bright_contrast(img, 0, 25)  # brightness and contrast
+img = bright_contrast(img, 0, threshold_yen(img) // 6)  # brightness and contrast
+# print(yen_threshold)
 show(img)
 
 # IMAGE PROCESSING
@@ -114,19 +118,22 @@ haar_rect = {"i": 0, "val": 100000, "center": (0, 0), "wh": (0, 0)}
 
 for i, (dX, dY, dW, dH) in enumerate(detected_rects):
     # Draw the face bounding box on the frame
-    cv2.rectangle(img, (dX, dY), (dX + dW, dY + dH), (30, 200, 230), 2)
 
     # Calculate the center of the rectangle
     plus_center = (dX + dW // 2, dY + dH // 2)
 
     # Check if new center is closer to the real center than previous one
-    distance = sqrt((dX + dW / 2 - width / 2) ** 2 + (dY + dH / 2 - height / 2) ** 2)
-    if haar_rect["val"] > distance:
+    distance = sqrt(plus_center[0] ** 2 + plus_center[1] ** 2)
+    if distance < haar_rect["val"] or haar_rect["val"] == 0:
         # Update the haar_rect dictionary with the new closest rectangle's information
         haar_rect["val"] = distance
         haar_rect["center"] = plus_center
         haar_rect["wh"] = (dW, dH)
+        haar_rect["xy"] = (dX, dY)
         haar_rect["i"] = i
+
+cv2.rectangle(img, (haar_rect["xy"][0], haar_rect["xy"][1]),
+              (haar_rect["xy"][0] + haar_rect["wh"][0], haar_rect["xy"][1] + haar_rect["wh"][1]), (30, 200, 230), 2)
 
 contours, _ = cv2.findContours(
     invert(img_center_only), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
@@ -245,7 +252,7 @@ show(mask_blue)
 circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
-    1.1,
+    1.2,
     sizes["square"][0] // 2,
     param1=1300,
     param2=7,
@@ -260,6 +267,7 @@ if circles is not None:
     circles = np.uint16(np.around(circles))
     for i in circles[0, :]:
         center = (i[0], i[1])
+        # TODO : check l to center no more than d/2
         coordinates["aim_center"].append([i[0], i[1]])
         cv2.circle(img, center, 4, (0, 255, 0), 6)
         radius = i[2]
