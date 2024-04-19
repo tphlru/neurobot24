@@ -132,8 +132,11 @@ for i, (dX, dY, dW, dH) in enumerate(detected_rects):
         haar_rect["xy"] = (dX, dY)
         haar_rect["i"] = i
 
-cv2.rectangle(img, (haar_rect["xy"][0], haar_rect["xy"][1]),
-              (haar_rect["xy"][0] + haar_rect["wh"][0], haar_rect["xy"][1] + haar_rect["wh"][1]), (30, 200, 230), 2)
+cv2.rectangle(img,
+              (haar_rect["xy"][0], haar_rect["xy"][1]),
+              (haar_rect["xy"][0] + haar_rect["wh"][0], haar_rect["xy"][1] + haar_rect["wh"][1]),
+              (30, 200, 230),
+              2)
 
 contours, _ = cv2.findContours(
     invert(img_center_only), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
