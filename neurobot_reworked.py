@@ -49,16 +49,19 @@ planewidth = 260
 planeheight = 170
 dist_to_plane = 2200  # стандартное?
 min_accur = 50
+
+square_hcounts, square_wcounts = 4, 6
+
+pix_k = 1
+size_plus = 28
+cross2squareK: float = 43 / 33  # 20 / 15
+
 try:
     cal_k = float(
         inputimeout("Enter CAL_K value: ", timeout=2) or "2000" if not (environ.get('CAL_K')) else environ.get(
             'CAL_K'))  # 1.0
 except TimeoutOccurred:
     cal_k = 2000
-pix_k = 1
-size_plus = 28
-
-cross2squareK: float = 43 / 33  # 20 / 15
 
 
 def show(iimg, wd=400):
@@ -395,7 +398,7 @@ sizes["square"] = (
 print("Width of the square: ", sizes["square"][0])
 print("Height of the square: ", sizes["square"][1])
 
-sizes["plane"] = (sizes["square"][0] * 6, sizes["square"][1] * 4)
+sizes["plane"] = (sizes["square"][0] * square_wcounts, sizes["square"][1] * square_hcounts)
 
 print("Width of the plane: ", sizes["plane"][0])
 print("Height of the plane: ", sizes["plane"][1])
@@ -483,6 +486,33 @@ for aim in coordinates['aim_center']:
     print(centeredX, centeredY)
 
 pprint(sizes)
+
+
+def convert_coordinates(x, y, width, height):
+    """
+    Function to convert centered coordinates to normal
+    """
+    half_width = width / 2
+    half_height = height / 2
+    x_prime = x + half_width
+    y_prime = height - y - half_height
+    return int(x_prime), int(y_prime)
+
+
+matrix = [[0] * square_wcounts for i in range(square_hcounts)]
+for oldx, oldy in zip([i[0] for i in centered_coordinates], [i[1] for i in centered_coordinates]):
+    newx = oldx // sizes['square'][0]
+    newx = newx + 1
+    newy = oldy // sizes['square'][1]
+    newx, newy = convert_coordinates(newx, newy, square_wcounts, square_hcounts)
+    newx = min(square_wcounts, max(0, newx))
+    newy = min(square_hcounts, max(0, newy))
+    print(newx, newy)
+    matrix[newy-1][newx-1] = 1
+
+plt.figure()
+plt.imshow(matrix)
+plt.show()
 
 servo_angles = []
 for coord in centered_coordinates:
