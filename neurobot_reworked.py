@@ -74,7 +74,7 @@ def show(iimg, wd=400):
     cv2.destroyAllWindows()
 
 
-image = cv2.imread(workpath + "photo.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
+image = cv2.imread(workpath + "rect4.png")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
 
 # read frame from cam
 cam = cv2.VideoCapture(0)
@@ -299,7 +299,7 @@ def filter_list(lst, places=5):
     return result
 
 
-cnts_info = filter_list(cnts_info)
+cnts_info = filter_list(cnts_info) if len(cnts_info) > 1 else cnts_info
 print(f"Removed {len(contours) - len(cnts_info)} contours totally.")
 pprint(cnts_info)
 
@@ -359,6 +359,9 @@ for detect in detects:
                     flag = False
             else:
                 temp_perfect = cnt
+
+        if len(cnts_info) <= 1:
+            temp_perfect = cnt
 
 if len(perfects) == 0:
     perfects.append(temp_perfect)
@@ -501,18 +504,20 @@ def convert_coordinates(x, y, width, height):
 
 matrix = [[0] * square_wcounts for i in range(square_hcounts)]
 for oldx, oldy in zip([i[0] for i in centered_coordinates], [i[1] for i in centered_coordinates]):
-    newx = oldx // sizes['square'][0]
+    newx = oldx // (sizes['square'][0] * pix_k)
     newx = newx + 1
-    newy = oldy // sizes['square'][1]
+    newy = oldy // (sizes['square'][1] * pix_k)
     newx, newy = convert_coordinates(newx, newy, square_wcounts, square_hcounts)
     newx = min(square_wcounts, max(0, newx))
     newy = min(square_hcounts, max(0, newy))
     print(newx, newy)
-    matrix[newy-1][newx-1] = 1
+    matrix[newy - 1][newx - 1] = 1
 
 plt.figure()
 plt.imshow(matrix)
 plt.show()
+
+pprint(matrix)
 
 servo_angles = []
 for coord in centered_coordinates:
