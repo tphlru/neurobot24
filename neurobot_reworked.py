@@ -51,10 +51,10 @@ dist_to_plane = 2200  # стандартное?
 min_accur = 50
 
 square_hcounts, square_wcounts = 4, 6
+size_plus = 33
+cross2squareK: float = 43 / 33  # 20 / 15
 
 pix_k = 1
-size_plus = 28
-cross2squareK: float = 43 / 33  # 20 / 15
 
 try:
     cal_k = float(
@@ -74,7 +74,7 @@ def show(iimg, wd=400):
     cv2.destroyAllWindows()
 
 
-image = cv2.imread(workpath + "rect4.png")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
+image = cv2.imread(workpath + "photo3.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
 
 # read frame from cam
 cam = cv2.VideoCapture(0)
@@ -316,12 +316,12 @@ temp_perfect = []
 for detect in detects:
     # Создаём отдельно для каждой зоны диапазоны
     rX = range(
-        detect["xy"][0],
-        detect["xy"][0] + detect["wh"][0],
+        int((detect["xy"][0]) * 0.95),
+        int((detect["xy"][0] + detect["wh"][0]) * 1.05),
     )
     rY = range(
-        detect["xy"][1],
-        detect["xy"][1] + detect["wh"][1],
+        int((detect["xy"][1]) * 0.95),
+        int((detect["xy"][1] + detect["wh"][1]) * 1.05),
     )
 
     # print(detect["xy"][0], detect["xy"][1])
@@ -332,7 +332,6 @@ for detect in detects:
     for cnt in cnts_info:
         cntRx = range(round(cnt['x'] - cnt['rW'] / 2), round(cnt['x'] + cnt['rW'] / 2))
         cntRy = range(round(cnt['y'] - cnt['rH'] / 2), round(cnt['y'] + cnt['rH'] / 2))
-
         if set(cntRx).issubset(rX) and set(cntRy).issubset(rY):
             print("This's our case!", cnt['i'])
             if len(cnts_info) > 1:
@@ -363,7 +362,7 @@ for detect in detects:
         if len(cnts_info) <= 1:
             temp_perfect = cnt
 
-if len(perfects) == 0:
+if not any(perfects):
     perfects.append(temp_perfect)
 
 pprint(perfects)
@@ -426,10 +425,11 @@ angles = [angle for angle in angles if abs(max(abs(angle), 180) - min(abs(angle)
 
 print(f"Found {len(lines_list)} on the plane, {len(angles)} of them are horizontal.")
 
-deltaAng = abs(max(abs(statistics.median(angles)), 180) - min(abs(statistics.median(angles)), 180))
+deltaAng = (max((statistics.median(angles)), 180) - min((statistics.median(angles)), 180)) * -1
+print("delta_ang", deltaAng)
 
 # get rotation matrix around plus center
-M = cv2.getRotationMatrix2D((center_x, center_y), -deltaAng, 1.0)
+M = cv2.getRotationMatrix2D((center_x, center_y), deltaAng, 1.0)
 img = cv2.warpAffine(img, M, image.shape[1::-1])  # rotate whole image
 mask_blue = cv2.warpAffine(mask_blue, M, image.shape[1::-1])  # rotate whole mask_blue
 
@@ -451,16 +451,18 @@ mask_blue = (mask_blue[
 coordinates["center"][0] = coordinates["center"][0] - (center_x - round(plane_w / 2))
 coordinates["center"][1] = coordinates["center"][1] - (center_y - round(plane_h / 2))
 
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))
+
 show(img, 500)
 show(mask_blue, 500)
 
 circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
-    1.2,
+    1.15,
     sizes["square"][0] // 2,
     param1=1300,
-    param2=6,
+    param2=8,
     minRadius=round(sizes["square"][0] / 6),
     maxRadius=round(sizes["square"][0] / 4),
 )
