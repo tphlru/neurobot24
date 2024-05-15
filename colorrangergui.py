@@ -4,9 +4,10 @@ from tools.processtool import mask_by_color, mask_center, invert
 from PIL import Image, ImageTk
 import cv2
 
-hmin, smin, vmin, hmax, smax, vmax = 0, 0, 0, 0, 0, 0
+hmin, smin, vmin = 0, 94, 68
+hmax, smax, vmax = 23, 255, 195
 
-immmg = cv2.imread("photo68.jpg")
+immmg = cv2.imread("photo2.jpg")
 testset = [(0, 0, 0), (255, 255, 255)]
 
 
@@ -19,7 +20,7 @@ def print_values():
     smax = slider5.get()
     vmax = slider6.get()
     testset = [(hmin, smin, vmin), (hmax, smax, vmax)]
-
+    print(testset)
 
 def update():
     print_values()
@@ -34,32 +35,37 @@ def update():
     imgtk = ImageTk.PhotoImage(image=im)
     img_label.configure(image=imgtk, width=600, height=600)
     img_label.image = imgtk
-    
-    
+
     root.after(300, update)
 
 
 root = tk.Tk()
 
 slider1 = tk.Scale(root, from_=0, to=255, orient='horizontal', label='h min')
+slider1.set(hmin)
 slider1.pack()
 
 slider2 = tk.Scale(root, from_=0, to=255, orient='horizontal', label='s min')
+slider2.set(smin)
 slider2.pack()
 
 slider3 = tk.Scale(root, from_=0, to=255, orient='horizontal', label='v min')
+slider3.set(vmin)
 slider3.pack()
 
 separator = tk.Frame(root, height=2, bd=1, relief=tk.SUNKEN)
 separator.pack(padx=10, pady=5, fill=tk.X)
 
 slider4 = tk.Scale(root, from_=0, to=255, orient='horizontal', label='h max')
+slider4.set(hmax)
 slider4.pack()
 
 slider5 = tk.Scale(root, from_=0, to=255, orient='horizontal', label='s max')
+slider5.set(smax)
 slider5.pack()
 
 slider6 = tk.Scale(root, from_=0, to=255, orient='horizontal', label='v max')
+slider6.set(vmax)
 slider6.pack()
 
 button = tk.Button(root, text='Get Slider Values', command=print_values)

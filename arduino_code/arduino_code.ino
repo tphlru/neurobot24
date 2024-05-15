@@ -6,8 +6,8 @@ bool ready_x, ready_y;
 uint32_t servoTimer;
 uint32_t turnTimer;
 
-int deg_x = 90;
-int deg_y = 90;
+float deg_x = 90;
+float deg_y = 90;
 
 void setup() {
   Serial.begin(9600);
@@ -33,16 +33,20 @@ void loop() {
     int xi = got.indexOf('x');
     int yi = got.indexOf('y');
     deg_x = (got.substring(xi+1, yi)).toInt();
-    deg_x = 180 - map(deg_x, -90, 90, 0, 180);
     deg_y = (got.substring(yi+1)).toInt();
+    
+    deg_x = 180 - map(deg_x, -90, 90, 0, 180);
     deg_y = 180 - map(deg_y, -90, 90, 0, 180);
+
+    deg_x = constrain(deg_x, 0, 180);
+    deg_y = 180 - constrain(deg_y, 0, 180);
     
     servos[0].setTargetDeg(deg_x);
-    servos[1].setTargetDeg(deg_y);    
+    servos[1].setTargetDeg(deg_y);
   }
   
-  if (millis() - servoTimer >= 20) {
-    servoTimer += 20;
+  if (millis() - servoTimer >= 30) {
+    servoTimer += 30;
     ready_x = servos[0].tickManual();
     ready_y = servos[1].tickManual();
   }
