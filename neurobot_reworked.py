@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import statistics
-from math import sqrt, atan2, atan, degrees, cos
+from math import sqrt, atan2, atan, degrees, cos, radians, acos, copysign
 from os import environ
 from pprint import pprint
 
@@ -41,21 +41,21 @@ planewidth = 260
 planeheight = 170
 dist_to_plane = 2200  # стандартное?
 min_accur = 50
-
 square_hcounts, square_wcounts = 4, 6
 size_plus = 33
 cross2squareK: float = 43 / 33  # 20 / 15
+square_cm = 4.5
 
 pix_k = 1
-floor_plus = 40  # real (in cm) distance between the floor (laser level) and plus
-floor_bottom = 5  # real (in cm) distance between the floor (laser level) and bottom of the plane
+floor_plus = 11  # real (in cm) distance between the floor (laser level) and plus
+floor_bottom = 0  # real (in cm) distance between the floor (laser level) and bottom of the plane
 
 try:
     cal_k = float(
         inputimeout("Enter CAL_K value: ", timeout=2) or "2000" if not (environ.get('CAL_K')) else environ.get(
             'CAL_K'))  # 1.0
 except TimeoutOccurred:
-    cal_k = 2000
+    cal_k = 3420.0
 
 
 def show(iimg, wd=400):
@@ -64,9 +64,9 @@ def show(iimg, wd=400):
     iimg = cv2.resize(iimg, (wd, round(wd / ratio)), interpolation=cv2.INTER_LINEAR)
     # img = cv2.cvtColor(iimg, cv2.COLOR_HSV2BGR)
     # TODO: HERE DISABLE/ENABLE
-    cv2.imshow(str(wd), iimg)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow(str(wd), iimg)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
 
 image = cv2.imread(workpath + "photo68.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
@@ -571,20 +571,50 @@ plt.imshow(matrix)
 plt.show()
 
 # -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ВЕРТИКАЛЬНОЙ ОСИ --------
+y_coords = [y[1] for y in matrix_coords]
+print("vertical coords", y_coords)
 
 # Базовый угол, на который нужно повернуть серву, чтобы попасть в плюс
-base_ang_y = atan(floor_plus / dist_to_plane)
+base_ang_y = degrees(atan(floor_plus / dist_to_plane))
+print("base_ang_y", base_ang_y)
 # TODO: ADD BASE_ANG REAL TEST FEATURE
 
 # Считаем гипотенузу (длину луча по Y на базовом угле)
 # https://w.wiki/A45H
-base_gyp_y = dist_to_plane / cos(base_ang_y)
+base_gyp_y = sqrt(floor_plus ** 2 + dist_to_plane ** 2)
+print("base_gyp_y", base_gyp_y)
 
 # Считаем угол пересечения луча с холстом (baseline - contact_point - y_plane)
 bcy = 180 - (90 - base_ang_y)
+print("bcy", bcy)
+
+y_coords = [(y - 2.5) * -1 for y in y_coords]  # back to centerd coords. Again)))
+print("vertical centered coords", y_coords)
+
+y_coords = [y * square_cm for y in y_coords]  # turn to cm
+print("vertical centered coords in cm", y_coords)
+
+ang_y_vals = []
+
+# Решаем треугольник через 2 стороны (y_coords и base_gyp_y) и угол между ними (bcy)
+# https://w.wiki/A64E
+for dec_y in y_coords:
+    # Сначала нужна гипотенуза (длина луча в позиции)
+    newgyp = sqrt(dec_y ** 2 + base_gyp_y ** 2 - (2 * dec_y * base_gyp_y * cos(radians(bcy))))
+    # Теперь считаем угол, опять по закону косинусов
+    ang_y = degrees(acos(((base_gyp_y ** 2 + newgyp ** 2 - dec_y ** 2) / (2 * newgyp * base_gyp_y))))
+    # Получилось, но потерялся знак (теперь это модуль угла)
+    # Скопируем знак у координаты (centered) по y
+    ang_y = copysign(ang_y, dec_y)
+    # Это относительный от базового угол
+    # Сделаем абсолютным
+    ang_y = base_ang_y + ang_y
+    ang_y_vals.append(ang_y)
+    print(ang_y)
+
+print(ang_y_vals)
 
 # -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ВЕРТИКАЛЬНОЙ ОСИ --------
-
 
 base_ang_x = 0
 
