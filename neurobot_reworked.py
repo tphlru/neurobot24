@@ -37,7 +37,7 @@ color_ranges = {
     "red": [[(0, 131, 68), (23, 255, 161)], [(160, 131, 68), (250, 255, 161)]],
     # "blue": [(80, 85, 25), (200, 255, 255)],
     # "blue": [(30, 23, 49), (120, 154, 203)],
-    "blue": [(8, 34, 94), (120, 139, 135)],
+    "blue": [(0, 128, 45), (255, 176, 161)],
     "black": [(0, 0, 0), (255, 255, 36)],
 }
 
@@ -57,10 +57,10 @@ floor_bottom = 60  # real (in cm) distance between the floor (laser level) and b
 
 try:
     cal_k = float(
-        inputimeout("Enter CAL_K value: ", timeout=2) or "15555.5" if not (environ.get('CAL_K')) else environ.get(
+        inputimeout("Enter CAL_K value: ", timeout=2) or "15402.0" if not (environ.get('CAL_K')) else environ.get(
             'CAL_K'))  # 1.0
 except TimeoutOccurred:
-    cal_k = 15555.5
+    cal_k = 15402.0
 
 
 def show(iimg, wd=400):
@@ -74,17 +74,18 @@ def show(iimg, wd=400):
     cv2.destroyAllWindows()
 
 
-# image = cv2.imread(workpath + "photo68.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
+image = cv2.imread(workpath + "photo68.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
 
-# read frame from cam
-cam = cv2.VideoCapture(0)
-# set cam params
-cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-ret, frame = cam.read()
-cam.release()
 
-image = frame
+# # read frame from cam
+# cam = cv2.VideoCapture(0)
+# # set cam params
+# cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+# cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+# ret, frame = cam.read()
+# cam.release()
+#
+# image = frame
 
 
 def heq(iimg):
@@ -157,7 +158,9 @@ mask_blue = cv2.subtract(invert(mask_red), invert(mask_blue))
 # Close possible holes in the aims
 mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=3))
 
-# mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=4))
+
 # -------- PREPARE BLUE MASK --------
 
 show(mask_blue)
@@ -220,7 +223,7 @@ mask_red_detectable = (mask_red[np.min(y_nonzero):np.max(y_nonzero), np.min(x_no
 detected_cross = cascade.detectMultiScale(
     invert(mask_red_detectable),  # for some reason, it detects black, not white
     scaleFactor=1.1,
-    minNeighbors=20,
+    minNeighbors=17,
     minSize=(35, 35),
     maxSize=(200, 200),
 )
@@ -306,13 +309,13 @@ def filter_list(lst, places=5):
     rw = range(int(med_w - places), int(med_w + places))
 
     for d in lst:
-        if d['rW'] not in rw and d['rH'] not in rh:
+        if d['w'] not in rw and d['h'] not in rh:
             result.append(d)
 
     return result
 
 
-cnts_info = filter_list(cnts_info) if len(cnts_info) > 1 else cnts_info
+cnts_info = filter_list(cnts_info) if len(cnts_info) > 4.5 else cnts_info
 print(f"Removed {len(contours) - len(cnts_info)} contours totally.")
 pprint(cnts_info)
 
@@ -325,6 +328,10 @@ show(img, 400)
 
 perfects = []
 temp_perfect = []
+
+perfect_ranges = []
+temp_perfect_range = []
+
 # Также обхожу каждый элемент (каждую зону)
 for detect in detects:
     # Создаём отдельно для каждой зоны диапазоны
@@ -364,6 +371,7 @@ for detect in detects:
                     elif num_rat != 0:
                         flag = False
                         temp_perfect = cnt
+                        temp_perfect_range = (rX, rY)
                         # break
                     else:
                         continue
@@ -371,16 +379,20 @@ for detect in detects:
                 if flag:
                     if cnt not in perfects:
                         perfects.append(cnt)
+                        perfect_ranges.append((rX, rY))
                     flag = False
             else:
                 temp_perfect = cnt
+                temp_perfect_range = (rX, rY)
 
         if len(cnts_info) <= 1:
             temp_perfect = cnt
+            temp_perfect_range = (rX, rY)
 
 if not any(perfects):
     print("tempperfect!!!!")
     perfects.append(temp_perfect)
+    perfect_ranges.append(temp_perfect_range)
 
 pprint(perfects)
 for ii in perfects:
@@ -388,10 +400,12 @@ for ii in perfects:
 print(f"Found {len(perfects)} perfect(s)!")
 pprint(perfects)
 perfect = perfects[-1]
+perfect_range = perfect_ranges[-1]
 
 # sizes["plus"] = [perfect['rW'], perfect['rH']]  # save width and height
 sizes["plus"] = [max(perfect['rW'], perfect['rH']), max(perfect['rW'], perfect['rH'])]
-coordinates["center"] = [perfect['x'], perfect['y']]  # save center
+coordinates["center"] = [perfect['x'] + round(perfect['rW'] / 2), perfect['y'] + round(perfect['rH'] / 2)]
+# save center
 
 show(img, 600)
 
@@ -448,7 +462,7 @@ if len(angles) == 0:
 # TODO: Нужно протестировать. Возможно,  360 - x
 medang = statistics.median(angles)
 print("Median horizontal angle =", medang)
-deltaAng = min((180 - medang), (180 + medang))
+deltaAng = 360 - min((180 - medang), (180 + medang))
 print("delta_ang", deltaAng)
 
 # get rotation matrix around plus center
@@ -479,8 +493,6 @@ mask_blue = (mask_blue[
 coordinates["center"][0] = coordinates["center"][0] - (center_x - round(plane_w / 2))
 coordinates["center"][1] = coordinates["center"][1] - (center_y - round(plane_h / 2))
 
-mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))
-
 show(img, 500)
 show(mask_blue, 500)
 
@@ -488,11 +500,11 @@ circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
     1.3,
-    sizes["square"][0] // 2,
-    param1=900,
-    param2=6,
-    minRadius=round(sizes["square"][0] / 8.5),
-    maxRadius=round(sizes["square"][0] / 5.5),
+    sizes["square"][0] // 3,
+    param1=1000,
+    param2=5,
+    minRadius=round(sizes["square"][0] / 8),
+    maxRadius=round(sizes["square"][0] / 6),
 )
 print("Circles: ", circles)
 
@@ -500,20 +512,24 @@ if circles is not None:
     circles = np.uint16(np.around(circles))
     for i in circles[0, :]:
         center = (i[0], i[1])
-        coordinates["aim_center"].append([i[0], i[1]])
-        cv2.circle(img, center, 3, (0, 255, 0), 4)
-        radius = i[2]
-        cv2.circle(img, center, radius, (255, 0, 255), 2)
+        # TODO: this in new check. Need to be tested
+        if center[0] not in perfect_range[0] and center[1] not in perfect_range[1]:
+            coordinates["aim_center"].append([i[0], i[1]])
+            cv2.circle(img, center, 3, (0, 255, 0), 4)
+            radius = i[2]
+            cv2.circle(img, center, radius, (255, 0, 255), 2)
 
 show(img)
 
 centered_coordinates = []
 for aim in coordinates['aim_center']:
-    centeredX = coordinates['center'][0] - aim[0]
-    centeredX = centeredX * pix_k * -1
+    # centeredX = coordinates['center'][0] - aim[0]
+    # centeredX = centeredX * pix_k * -1
+    centeredX = aim[0] * pix_k
 
-    centeredY = coordinates['center'][1] - aim[1]
-    centeredY = centeredY * pix_k
+    # centeredY = coordinates['center'][1] - aim[1]
+    # centeredY = centeredY * pix_k
+    centeredY = aim[1] * pix_k
 
     centered_coordinates.append([centeredX, centeredY])
     print(centeredX, centeredY)
@@ -527,20 +543,29 @@ def convert_coordinates(x, y, width, height):
     """
     half_width = width / 2
     half_height = height / 2
-    x_prime = x + half_width
-    y_prime = height - y - half_height
+    signs_matcher = {
+        -1: 1,
+        1: 0,
+    }
+    x_sign = signs_matcher.get(int(copysign(1, x)))
+    y_sign = signs_matcher.get(int(copysign(1, y))) * (-1)
+    x_prime = x + half_width + x_sign
+    y_prime = (y - half_width) * (-1) + y_sign
     return int(x_prime), int(y_prime)
 
 
 matrix = [[0] * square_wcounts for i in range(square_hcounts)]
 matrix_coords = []
-for oldx, oldy in zip([i[0] for i in centered_coordinates], [i[1] for i in centered_coordinates]):
-    newx = oldx // (sizes['square'][0] * pix_k)
-    newx = newx + 1
-    newy = oldy // (sizes['square'][1] * pix_k)
-    newx, newy = convert_coordinates(newx, newy, square_wcounts, square_hcounts)
+for oldx, oldy in centered_coordinates:
+    kx = planewidth / (square_wcounts * 100)
+    ky = planeheight / (square_hcounts * 100)
+
+    newx = round((oldx / kx) // 100 + 1)
+    newy = round((oldy / ky) // 100 + 1)
+
     newx = min(square_wcounts, max(0, newx))
     newy = min(square_hcounts, max(0, newy))
+
     print(newx, newy)
     matrix_coords.append([newx, newy])
     matrix[newy - 1][newx - 1] = 1
@@ -671,11 +696,13 @@ for dec_x in x_coords:
 print(ang_x_vals)
 # -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ГОРИЗОНТАЛЬНОЙ ОСИ --------
 
-relative_angs = [[ang_x_vals[i], ang_y_vals[i]] for i in range(max(len(ang_x_vals), len(ang_y_vals)))]
+relative_angs = [[ang_x_vals[i], ang_y_vals[i]] for i in range(len(matrix_coords))]
 print(relative_angs)
 
 time.sleep(1)
-# arduino.set_xy(base_ang_x, base_ang_y)
+
+arduino.set_xy(base_ang_x * 4, base_ang_y * 4)
+time.sleep(4)
 
 for i in relative_angs:
     arduino.set_xy(i[0] * 4, i[1] * 4)

@@ -4,8 +4,8 @@ from tools.processtool import mask_by_color, mask_center, invert
 from PIL import Image, ImageTk
 import cv2
 
-hmin, smin, vmin = 30, 23, 49
-hmax, smax, vmax = 120, 154, 203
+hmin, smin, vmin = 49, 34, 20
+hmax, smax, vmax = 120, 145, 205
 
 # immmg = cv2.imread("photo2.jpg")
 
