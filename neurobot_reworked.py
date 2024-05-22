@@ -202,19 +202,27 @@ show(cop, 600)
 
 # Init cascade
 cascade = cv2.CascadeClassifier()
-cascade.load(workpath + "cascade.xml")  # load cascade
+cascade.load(workpath + "cascade2.xml")  # load cascade
 
 # Crop black borders
 y_nonzero, x_nonzero = np.nonzero(mask_red)
 mask_red_detectable = (mask_red[np.min(y_nonzero):np.max(y_nonzero), np.min(x_nonzero):np.max(x_nonzero)])
 
 # Detect cross using cascade
+# detected_cross = cascade.detectMultiScale(
+#     invert(mask_red_detectable),  # for some reason, it detects black, not white
+#     scaleFactor=1.03,
+#     minNeighbors=16,
+#     minSize=(60, 60),
+#     maxSize=(175, 175),
+# )
+
 detected_cross = cascade.detectMultiScale(
     invert(mask_red_detectable),  # for some reason, it detects black, not white
-    scaleFactor=1.03,
-    minNeighbors=16,
-    minSize=(60, 60),
-    maxSize=(175, 175),
+    scaleFactor=1.1,
+    minNeighbors=20,
+    minSize=(35, 35),
+    maxSize=(200, 200),
 )
 
 print(f"Found {len(detected_cross)} objects using haar cascade!")
@@ -289,10 +297,10 @@ for i, cnt in enumerate(contours):
 def filter_list(lst, places=5):
     result = []
 
-    med_h = statistics.median([d['rW'] for d in cnts_info])
-    med_w = statistics.median([d['rH'] for d in cnts_info])
+    med_h = statistics.median([d['h'] for d in cnts_info])
+    med_w = statistics.median([d['w'] for d in cnts_info])
 
-    places = 2.5
+    places = 2
 
     rh = range(int(med_h - places), int(med_h + places))
     rw = range(int(med_w - places), int(med_w + places))
@@ -348,7 +356,10 @@ for detect in detects:
                     num_rat = dist_to_other / max(cnt['w'], cnt['h'])
                     print(num_rat)
 
-                    if 6 < num_rat < 25 and num_rat != 0:
+                    norm_ratio = min(len(rX), len(rY)) / min(len(cntRx), len(cntRy))
+                    print("haar zone size to cnt size ratio =", norm_ratio)
+
+                    if 6 < num_rat < 25 and num_rat != 0 and norm_ratio < 3:
                         flag = True
                     elif num_rat != 0:
                         flag = False
