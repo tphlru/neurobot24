@@ -4,10 +4,20 @@ from tools.processtool import mask_by_color, mask_center, invert
 from PIL import Image, ImageTk
 import cv2
 
-hmin, smin, vmin = 0, 94, 68
-hmax, smax, vmax = 23, 255, 195
+hmin, smin, vmin = 30, 23, 49
+hmax, smax, vmax = 120, 154, 203
 
-immmg = cv2.imread("photo2.jpg")
+# immmg = cv2.imread("photo2.jpg")
+
+cam = cv2.VideoCapture(0)
+# set cam params
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+ret, frame = cam.read()
+cam.release()
+
+immmg = frame
+
 testset = [(0, 0, 0), (255, 255, 255)]
 
 

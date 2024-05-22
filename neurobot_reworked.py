@@ -8,6 +8,7 @@ from pprint import pprint
 import cv2
 # from skimage import io, exposure, data
 import numpy as np
+import time
 # from google.colab import drive
 # from google.colab.patches import cv2_imshow
 from inputimeout import inputimeout, TimeoutOccurred
@@ -15,6 +16,7 @@ from matplotlib import pyplot as plt
 
 from tools.filters import bright_contrast  # histogram_adp
 from tools.processtool import mask_by_color, mask_center, invert
+import arduino
 
 # drive.mount('/content/drive')
 # os.chdir(workpath),
@@ -22,8 +24,8 @@ from tools.processtool import mask_by_color, mask_center, invert
 
 workpath = ""
 
-# arduino = arduino.Arduino(serport="/dev/ttyACM0", baud=9600)
-# arduino.init_arduino()
+arduino = arduino.Arduino(serport="/dev/ttyUSB0", baud=9600)
+arduino.init_arduino()
 
 coordinates = {"aim_center": []}
 hyps: list = []  # list to save hypotheses to the center
@@ -31,31 +33,34 @@ sizes = {}
 
 color_ranges = {
     "white": [(0, 0, 90), (255, 130, 255)],  # inscrease 130 here for better white detection
-    "red": [[(0, 94, 68), (23, 255, 195)], [(160, 30, 68), (250, 255, 195)]],
-    "blue": [(80, 85, 25), (200, 255, 255)],
+    # "red": [[(0, 94, 68), (23, 255, 195)], [(160, 30, 68), (250, 255, 195)]],
+    "red": [[(0, 131, 68), (23, 255, 161)], [(160, 131, 68), (250, 255, 161)]],
+    # "blue": [(80, 85, 25), (200, 255, 255)],
+    # "blue": [(30, 23, 49), (120, 154, 203)],
+    "blue": [(8, 34, 94), (120, 139, 135)],
     "black": [(0, 0, 0), (255, 255, 36)],
 }
 
 # сonstants
-planewidth = 260
-planeheight = 170
+planewidth = 1200
+planeheight = 800
 dist_to_plane = 2200  # стандартное?
 min_accur = 50
 square_hcounts, square_wcounts = 4, 6
-size_plus = 33
-cross2squareK: float = 43 / 33  # 20 / 15
-square_cm = 4.5
+size_plus = 150
+cross2squareK: float = 200 / 150  # 20 / 15
+square_cm = 20
 
 pix_k = 1
-floor_plus = 11  # real (in cm) distance between the floor (laser level) and plus
-floor_bottom = 0  # real (in cm) distance between the floor (laser level) and bottom of the plane
+floor_plus = 60  # real (in cm) distance between the floor (laser level) and plus
+floor_bottom = 60  # real (in cm) distance between the floor (laser level) and bottom of the plane
 
 try:
     cal_k = float(
-        inputimeout("Enter CAL_K value: ", timeout=2) or "2000" if not (environ.get('CAL_K')) else environ.get(
+        inputimeout("Enter CAL_K value: ", timeout=2) or "15555.5" if not (environ.get('CAL_K')) else environ.get(
             'CAL_K'))  # 1.0
 except TimeoutOccurred:
-    cal_k = 3420.0
+    cal_k = 15555.5
 
 
 def show(iimg, wd=400):
@@ -64,12 +69,12 @@ def show(iimg, wd=400):
     iimg = cv2.resize(iimg, (wd, round(wd / ratio)), interpolation=cv2.INTER_LINEAR)
     # img = cv2.cvtColor(iimg, cv2.COLOR_HSV2BGR)
     # TODO: HERE DISABLE/ENABLE
-    # cv2.imshow(str(wd), iimg)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    cv2.imshow(str(wd), iimg)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
-image = cv2.imread(workpath + "photo68.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
+# image = cv2.imread(workpath + "photo68.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
 
 # read frame from cam
 cam = cv2.VideoCapture(0)
@@ -79,8 +84,8 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 ret, frame = cam.read()
 cam.release()
 
+image = frame
 
-# image = frame
 
 def heq(iimg):
     # We first create a CLAHE model based on OpenCV
@@ -99,7 +104,7 @@ def heq(iimg):
 
 img = image.copy()
 img = heq(img)
-img = bright_contrast(img, -10, 5)  # brightness and contrast
+img = bright_contrast(img, -2, 5)  # brightness and contrast
 
 show(image)
 show(img)
@@ -136,7 +141,7 @@ mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=2))
 mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_DILATE, kernel, iterations=1))
 
 mask_red = cv2.subtract(mask_red, mask_black)  # Remove black from red (to avoid crooked plus)
-mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=2))
+mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=3))
 
 print("red mask")
 show(mask_red, 500)
@@ -152,7 +157,7 @@ mask_blue = cv2.subtract(invert(mask_red), invert(mask_blue))
 # Close possible holes in the aims
 mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=3))
 
-mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
+# mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
 # -------- PREPARE BLUE MASK --------
 
 show(mask_blue)
@@ -207,9 +212,9 @@ mask_red_detectable = (mask_red[np.min(y_nonzero):np.max(y_nonzero), np.min(x_no
 detected_cross = cascade.detectMultiScale(
     invert(mask_red_detectable),  # for some reason, it detects black, not white
     scaleFactor=1.03,
-    minNeighbors=7,
-    minSize=(14, 14),
-    maxSize=(150, 150),
+    minNeighbors=16,
+    minSize=(60, 60),
+    maxSize=(175, 175),
 )
 
 print(f"Found {len(detected_cross)} objects using haar cascade!")
@@ -221,11 +226,12 @@ detects = []
 for detect, (dX, dY, dW, dH) in enumerate(detected_cross):
     plus_center = (dX + dW // 2, dY + dH // 2)  # Calculate the center of the rectangle
 
-    if (max(dW, dH) / min(dW, dH)) > 1.35:  # Если соотношение сторон совсем-совмем неправильное
-        continue
-
     # Check if new center is closer to the real center than previous one
     distance = sqrt(plus_center[0] ** 2 + plus_center[1] ** 2)
+
+    # TODO: Check 30 here (too small)
+    if (max(dW, dH) / min(dW, dH)) > 1.5 or min(dW, dH) < 30:  # Если соотношение сторон совсем-совмем неправильное
+        continue
 
     temp_dict = dict()
     temp_dict["mindist"] = distance
@@ -286,7 +292,7 @@ def filter_list(lst, places=5):
     med_h = statistics.median([d['rW'] for d in cnts_info])
     med_w = statistics.median([d['rH'] for d in cnts_info])
 
-    places = 4
+    places = 2.5
 
     rh = range(int(med_h - places), int(med_h + places))
     rw = range(int(med_w - places), int(med_w + places))
@@ -315,12 +321,12 @@ temp_perfect = []
 for detect in detects:
     # Создаём отдельно для каждой зоны диапазоны
     rX = range(
-        int((detect["xy"][0]) * 0.95),
-        int((detect["xy"][0] + detect["wh"][0]) * 1.05),
+        int((detect["xy"][0])),
+        int((detect["xy"][0] + detect["wh"][0])),
     )
     rY = range(
-        int((detect["xy"][1]) * 0.95),
-        int((detect["xy"][1] + detect["wh"][1]) * 1.05),
+        int((detect["xy"][1])),
+        int((detect["xy"][1] + detect["wh"][1])),
     )
 
     # print(detect["xy"][0], detect["xy"][1])
@@ -329,8 +335,8 @@ for detect in detects:
     # result = cv2.pointPolygonTest(contour, (x,y), False)
     # Обходим каждый контур
     for cnt in cnts_info:
-        cntRx = range(round(cnt['x'] - cnt['rW'] / 2), round(cnt['x'] + cnt['rW'] / 2))
-        cntRy = range(round(cnt['y'] - cnt['rH'] / 2), round(cnt['y'] + cnt['rH'] / 2))
+        cntRx = range(round(cnt['x'] - (cnt['rW'] / 2)), round(cnt['x'] + (cnt['rW'] / 2)))
+        cntRy = range(round(cnt['y'] - (cnt['rH'] / 2)), round(cnt['y'] + (cnt['rH'] / 2)))
         if set(cntRx).issubset(rX) and set(cntRy).issubset(rY):
             print("This's our case!", cnt['i'])
             if len(cnts_info) > 1:
@@ -342,12 +348,12 @@ for detect in detects:
                     num_rat = dist_to_other / max(cnt['w'], cnt['h'])
                     print(num_rat)
 
-                    if 6 < num_rat < 35 and num_rat != 0:
+                    if 6 < num_rat < 25 and num_rat != 0:
                         flag = True
                     elif num_rat != 0:
                         flag = False
                         temp_perfect = cnt
-                        break
+                        # break
                     else:
                         continue
 
@@ -369,8 +375,8 @@ pprint(perfects)
 for ii in perfects:
     cv2.drawContours(img, [contours[ii['i']]], -1, (0, 255, 0), 2)
 print(f"Found {len(perfects)} perfect(s)!")
-
-perfect = perfects[0]
+pprint(perfects)
+perfect = perfects[-1]
 
 # sizes["plus"] = [perfect['rW'], perfect['rH']]  # save width and height
 sizes["plus"] = [max(perfect['rW'], perfect['rH']), max(perfect['rW'], perfect['rH'])]
@@ -425,6 +431,9 @@ angles = [angle for angle in angles if abs(max(abs(angle), 180) - min(abs(angle)
 
 print(f"Found {len(lines_list)} on the plane, {len(angles)} of them are horizontal.")
 
+if len(angles) == 0:
+    angles = [180, 180, 180]
+
 # TODO: Нужно протестировать. Возможно,  360 - x
 medang = statistics.median(angles)
 print("Median horizontal angle =", medang)
@@ -467,12 +476,12 @@ show(mask_blue, 500)
 circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
-    1.17,
+    1.3,
     sizes["square"][0] // 2,
-    param1=1300,
-    param2=8,
-    minRadius=round(sizes["square"][0] / 6),
-    maxRadius=round(sizes["square"][0] / 4),
+    param1=900,
+    param2=6,
+    minRadius=round(sizes["square"][0] / 8.5),
+    maxRadius=round(sizes["square"][0] / 5.5),
 )
 print("Circles: ", circles)
 
@@ -572,7 +581,7 @@ plt.show()
 
 # -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ВЕРТИКАЛЬНОЙ ОСИ --------
 y_coords = [y[1] for y in matrix_coords]
-print("vertical coords", y_coords)
+print("y coords", y_coords)
 
 # Базовый угол, на который нужно повернуть серву, чтобы попасть в плюс
 base_ang_y = degrees(atan(floor_plus / dist_to_plane))
@@ -589,10 +598,10 @@ bcy = 180 - (90 - base_ang_y)
 print("bcy", bcy)
 
 y_coords = [(y - 2.5) * -1 for y in y_coords]  # back to centerd coords. Again)))
-print("vertical centered coords", y_coords)
+print("y centered coords", y_coords)
 
 y_coords = [y * square_cm for y in y_coords]  # turn to cm
-print("vertical centered coords in cm", y_coords)
+print("y centered coords in cm", y_coords)
 
 ang_y_vals = []
 
@@ -610,28 +619,53 @@ for dec_y in y_coords:
     # Сделаем абсолютным
     ang_y = base_ang_y + ang_y
     ang_y_vals.append(ang_y)
-    print(ang_y)
+    # print(ang_y)
 
 print(ang_y_vals)
 
 # -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ВЕРТИКАЛЬНОЙ ОСИ --------
 
+
+# -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ГОРИЗОНТАЛЬНОЙ ОСИ --------
+
+# matrix_to_centr = {
+#     1: -2.5,
+#     2: -1.5,
+#     3: -0.5,
+#     4: 0.5,
+#     5: 1.5,
+#     6: 2.5,
+# }
+
+# Базовый угол, на который нужно повернуть серву, чтобы попасть в плюс
 base_ang_x = 0
 
-# arduino.set_xy(random.randint(45, 135), random.randint(45, 135))
-# time.sleep(1)
+x_coords = [x[0] for x in matrix_coords]
+print("x coords", x_coords)
+
+# TODO: check this formul for x
+x_coords = [(x - 3.5) for x in x_coords]  # back to centerd coords. Again)))
+print("x centered coords", x_coords)
+
+x_coords = [x * square_cm for x in x_coords]  # turn to cm
+print("x centered coords in cm", x_coords)
+
+ang_x_vals = []
+
+for dec_x in x_coords:
+    ang_x = degrees(atan(dec_x / dist_to_plane))
+    ang_x = base_ang_x + ang_x
+    ang_x_vals.append(ang_x)
+
+print(ang_x_vals)
+# -------- РЕШЕНИЕ ТРЕУГОЛЬНИКА ПО ГОРИЗОНТАЛЬНОЙ ОСИ --------
+
+relative_angs = [[ang_x_vals[i], ang_y_vals[i]] for i in range(max(len(ang_x_vals), len(ang_y_vals)))]
+print(relative_angs)
+
+time.sleep(1)
 # arduino.set_xy(base_ang_x, base_ang_y)
 
-# servo_angles = []
-# for coord in centered_coordinates:
-#     ang_x = degrees(coord[0] / 10 / dist_to_plane)
-#     ang_y = degrees(coord[1] / 10 / dist_to_plane)
-#     servo_angles.append((ang_x, ang_y))
-
-# pprint(servo_angles)
-
-# for i in servo_angles:
-#     arduino.set_xy(90, 90)
-#     time.sleep(1)
-#     arduino.set_xy(round(i[0] - 0), round(i[1] + 19))
-#     time.sleep(4)
+for i in relative_angs:
+    arduino.set_xy(i[0] * 4, i[1] * 4)
+    time.sleep(4)
