@@ -1,13 +1,15 @@
 import tkinter as tk
 from tools.filters import bright_contrast  # histogram_adp
 from tools.processtool import mask_by_color, mask_center, invert
+from tools.filters import bright_contrast
+import numpy as np
 from PIL import Image, ImageTk
 import cv2
 
 hmin, smin, vmin = 49, 34, 20
 hmax, smax, vmax = 120, 145, 205
 
-# immmg = cv2.imread("photo2.jpg")
+immmg = cv2.imread("rect4.png")
 
 cam = cv2.VideoCapture(0)
 # set cam params
@@ -16,7 +18,26 @@ cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 ret, frame = cam.read()
 cam.release()
 
-immmg = frame
+
+def heq(iimg):
+    # We first create a CLAHE model based on OpenCV
+    # clipLimit defines threshold to limit the contrast in case of noise in our image
+    # tileGridSize defines the area size in which local equalization will be performed
+    clahe_model = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(32, 32))
+
+    # For ease of understanding, we explicitly equalize each channel individually
+    colorimage_b = clahe_model.apply(iimg[:, :, 0])
+    colorimage_g = clahe_model.apply(iimg[:, :, 1])
+    colorimage_r = clahe_model.apply(iimg[:, :, 2])
+
+    # Next we stack our equalized channels back into a single image
+    return np.stack((colorimage_b, colorimage_g, colorimage_r), axis=2)
+
+
+# immmg = frame
+
+immmg = heq(immmg)
+immmg = bright_contrast(immmg, 5, 5)  # brightness and contrast
 
 testset = [(0, 0, 0), (255, 255, 255)]
 
@@ -31,6 +52,7 @@ def print_values():
     vmax = slider6.get()
     testset = [(hmin, smin, vmin), (hmax, smax, vmax)]
     print(testset)
+
 
 def update():
     print_values()

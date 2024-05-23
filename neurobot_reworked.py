@@ -34,10 +34,11 @@ sizes = {}
 color_ranges = {
     "white": [(0, 0, 90), (255, 130, 255)],  # inscrease 130 here for better white detection
     # "red": [[(0, 94, 68), (23, 255, 195)], [(160, 30, 68), (250, 255, 195)]],
+    # "red": [(0, 49, 75), (109, 255, 255)],
     "red": [[(0, 131, 68), (23, 255, 161)], [(160, 131, 68), (250, 255, 161)]],
-    # "blue": [(80, 85, 25), (200, 255, 255)],
+    # "blue": [(34, 131, 49), (255, 255, 255)],
     # "blue": [(30, 23, 49), (120, 154, 203)],
-    "blue": [(0, 128, 45), (255, 176, 161)],
+    "blue": [(21, 0, 26), (195, 158, 173)],
     "black": [(0, 0, 0), (255, 255, 36)],
 }
 
@@ -74,18 +75,18 @@ def show(iimg, wd=400):
     cv2.destroyAllWindows()
 
 
-image = cv2.imread(workpath + "photo68.jpg")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
+# image = cv2.imread(workpath + "rect5.png")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
 
 
-# # read frame from cam
-# cam = cv2.VideoCapture(0)
-# # set cam params
-# cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-# cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-# ret, frame = cam.read()
-# cam.release()
-#
-# image = frame
+# read frame from cam
+cam = cv2.VideoCapture(0)
+# set cam params
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+ret, frame = cam.read()
+cam.release()
+
+image = frame
 
 
 def heq(iimg):
@@ -105,7 +106,7 @@ def heq(iimg):
 
 img = image.copy()
 img = heq(img)
-img = bright_contrast(img, -2, 5)  # brightness and contrast
+img = bright_contrast(img, 5, 5)  # brightness and contrast
 
 show(image)
 show(img)
@@ -156,10 +157,10 @@ mask_blue = mask_by_color(img, color_ranges['blue'])  # Shades of blue
 # Remove all the red-colored things from blue mask
 mask_blue = cv2.subtract(invert(mask_red), invert(mask_blue))
 # Close possible holes in the aims
-mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=3))
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=2))
 
 mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
-mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=4))
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=2))
 
 # -------- PREPARE BLUE MASK --------
 
@@ -223,7 +224,7 @@ mask_red_detectable = (mask_red[np.min(y_nonzero):np.max(y_nonzero), np.min(x_no
 detected_cross = cascade.detectMultiScale(
     invert(mask_red_detectable),  # for some reason, it detects black, not white
     scaleFactor=1.1,
-    minNeighbors=17,
+    minNeighbors=16,
     minSize=(35, 35),
     maxSize=(200, 200),
 )
@@ -315,7 +316,7 @@ def filter_list(lst, places=5):
     return result
 
 
-cnts_info = filter_list(cnts_info) if len(cnts_info) > 4.5 else cnts_info
+cnts_info = filter_list(cnts_info) if len(cnts_info) > 6 else cnts_info
 print(f"Removed {len(contours) - len(cnts_info)} contours totally.")
 pprint(cnts_info)
 
@@ -403,8 +404,9 @@ perfect = perfects[-1]
 perfect_range = perfect_ranges[-1]
 
 # sizes["plus"] = [perfect['rW'], perfect['rH']]  # save width and height
+
 sizes["plus"] = [max(perfect['rW'], perfect['rH']), max(perfect['rW'], perfect['rH'])]
-coordinates["center"] = [perfect['x'] + round(perfect['rW'] / 2), perfect['y'] + round(perfect['rH'] / 2)]
+coordinates["center"] = [round(perfect['x']), round(perfect['y'])]
 # save center
 
 show(img, 600)
@@ -478,20 +480,22 @@ show(img, 500)
 # print(round(plane_w / 2))
 
 # crop img by plane sizes
+
+print("!!!!!!!!!!!", center_y)
 img = (img[
-       max((center_y - round(plane_h / 2), 0)): max((center_y + round(plane_h / 2)), 0),
-       center_x - round(plane_w / 2): center_x + round(plane_w / 2),
+       max(round(center_y - (plane_h / 2)), 0): max(round(center_y + (plane_h / 2)), 0),
+       max(round(center_x - (plane_w / 2)), 0): max(round(center_x + (plane_w / 2)), 0),
        ])
 
 # show(img)
 mask_blue = (mask_blue[
-             max((center_y - round(plane_h / 2), 0)): max((center_y + round(plane_h / 2)), 0),
-             center_x - round(plane_w / 2): center_x + round(plane_w / 2),
+             max(round(center_y - (plane_h / 2)), 0): max(round(center_y + (plane_h / 2)), 0),
+             max(round(center_x - (plane_w / 2)), 0): max(round(center_x + (plane_w / 2)), 0),
              ])
 
 # recalculate center coordinates for cropped image
-coordinates["center"][0] = coordinates["center"][0] - (center_x - round(plane_w / 2))
-coordinates["center"][1] = coordinates["center"][1] - (center_y - round(plane_h / 2))
+coordinates["center"][0] = coordinates["center"][0] - round(center_x - (plane_w / 2))
+coordinates["center"][1] = coordinates["center"][1] - round(center_y - (plane_h / 2))
 
 show(img, 500)
 show(mask_blue, 500)
@@ -499,12 +503,12 @@ show(mask_blue, 500)
 circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
-    1.3,
+    1.25,
     sizes["square"][0] // 3,
-    param1=1000,
-    param2=5,
+    param1=900,
+    param2=6,
     minRadius=round(sizes["square"][0] / 8),
-    maxRadius=round(sizes["square"][0] / 6),
+    maxRadius=round(sizes["square"][0] / 5),
 )
 print("Circles: ", circles)
 
@@ -550,7 +554,7 @@ def convert_coordinates(x, y, width, height):
     x_sign = signs_matcher.get(int(copysign(1, x)))
     y_sign = signs_matcher.get(int(copysign(1, y))) * (-1)
     x_prime = x + half_width + x_sign
-    y_prime = (y - half_width) * (-1) + y_sign
+    y_prime = (y - half_height) * (-1) + y_sign
     return int(x_prime), int(y_prime)
 
 
