@@ -35,10 +35,10 @@ color_ranges = {
     "white": [(0, 0, 90), (255, 130, 255)],  # inscrease 130 here for better white detection
     # "red": [[(0, 94, 68), (23, 255, 195)], [(160, 30, 68), (250, 255, 195)]],
     # "red": [(0, 49, 75), (109, 255, 255)],
-    "red": [[(0, 131, 68), (23, 255, 161)], [(160, 131, 68), (250, 255, 161)]],
+    "red": [[(0, 161, 34), (23, 255, 255)], [(0, 161, 34), (250, 255, 255)]],
     # "blue": [(34, 131, 49), (255, 255, 255)],
     # "blue": [(30, 23, 49), (120, 154, 203)],
-    "blue": [(21, 0, 26), (195, 158, 173)],
+    "blue": [(23, 49, 8), (105, 161, 161)],
     "black": [(0, 0, 0), (255, 255, 36)],
 }
 
@@ -53,8 +53,8 @@ cross2squareK: float = 200 / 150  # 20 / 15
 square_cm = 20
 
 pix_k = 1
-floor_plus = 60  # real (in cm) distance between the floor (laser level) and plus
-floor_bottom = 60  # real (in cm) distance between the floor (laser level) and bottom of the plane
+floor_plus = 58.5  # real (in cm) distance between the floor (laser level) and plus
+floor_bottom = 58.5  # real (in cm) distance between the floor (laser level) and bottom of the plane
 
 try:
     cal_k = float(
@@ -105,8 +105,14 @@ def heq(iimg):
 
 
 img = image.copy()
+
+bimg = img.copy()  # Image copy for blue mask creation
+bimg = bright_contrast(bimg, 5, 5)  # brightness and contrast
+# bimg = heq(bimg)
+
+
 img = heq(img)
-img = bright_contrast(img, 5, 5)  # brightness and contrast
+img = bright_contrast(img, 5, 10)  # brightness and contrast
 
 show(image)
 show(img)
@@ -140,10 +146,11 @@ mask_red = mask_by_color(img, color_ranges['red'])  # Shades of red and pink
 mask_red = np.where(center_mask == 0, 0, mask_red)  # apply the center mask
 mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_DILATE, kernel, iterations=1))
 mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=2))
-mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_DILATE, kernel, iterations=1))
+mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_CLOSE, kernel, iterations=3))
+mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_DILATE, kernel, iterations=2))
 
-mask_red = cv2.subtract(mask_red, mask_black)  # Remove black from red (to avoid crooked plus)
-mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=3))
+# mask_red = cv2.subtract(mask_red, mask_black)  # Remove black from red (to avoid crooked plus)
+mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=2))
 
 print("red mask")
 show(mask_red, 500)
@@ -153,13 +160,13 @@ show(mask_red, 500)
 
 # -------- PREPARE BLUE MASK --------
 
-mask_blue = mask_by_color(img, color_ranges['blue'])  # Shades of blue
+mask_blue = mask_by_color(bimg, color_ranges['blue'])  # Shades of blue
 # Remove all the red-colored things from blue mask
 mask_blue = cv2.subtract(invert(mask_red), invert(mask_blue))
 # Close possible holes in the aims
 mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=2))
 
-mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
+# mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
 mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=2))
 
 # -------- PREPARE BLUE MASK --------
@@ -224,9 +231,9 @@ mask_red_detectable = (mask_red[np.min(y_nonzero):np.max(y_nonzero), np.min(x_no
 detected_cross = cascade.detectMultiScale(
     invert(mask_red_detectable),  # for some reason, it detects black, not white
     scaleFactor=1.1,
-    minNeighbors=16,
-    minSize=(35, 35),
-    maxSize=(200, 200),
+    minNeighbors=8,
+    minSize=(30, 30),
+    maxSize=(220, 220),
 )
 
 print(f"Found {len(detected_cross)} objects using haar cascade!")
@@ -316,7 +323,7 @@ def filter_list(lst, places=5):
     return result
 
 
-cnts_info = filter_list(cnts_info) if len(cnts_info) > 6 else cnts_info
+cnts_info = filter_list(cnts_info) if len(cnts_info) > 7 else cnts_info
 print(f"Removed {len(contours) - len(cnts_info)} contours totally.")
 pprint(cnts_info)
 
@@ -367,7 +374,15 @@ for detect in detects:
                     norm_ratio = min(len(rX), len(rY)) / min(len(cntRx), len(cntRy))
                     print("haar zone size to cnt size ratio =", norm_ratio)
 
-                    if 6 < num_rat < 25 and num_rat != 0 and norm_ratio < 3:
+                    ideal_plus_ratio_w = round(cnt['rW'] / cnt['w'], 1)
+                    ideal_plus_ratio_h = round(cnt['rH'] / cnt['h'], 1)
+                    ideal_plus_flag = (ideal_plus_ratio_w == 1.2 or ideal_plus_ratio_h == 1.2)
+                    print("Ideal-plus ratio for w:", ideal_plus_ratio_w, "and for h:", ideal_plus_ratio_h)
+
+                    if (num_rat < 25 and num_rat != 0 and norm_ratio < 3) and not ideal_plus_flag:
+                        temp_perfect = cnt
+                        temp_perfect_range = (rX, rY)
+                    elif (num_rat < 25 and num_rat != 0 and norm_ratio < 3) and ideal_plus_flag:
                         flag = True
                     elif num_rat != 0:
                         flag = False
@@ -506,7 +521,7 @@ circles = cv2.HoughCircles(
     1.25,
     sizes["square"][0] // 3,
     param1=900,
-    param2=6,
+    param2=5,
     minRadius=round(sizes["square"][0] / 8),
     maxRadius=round(sizes["square"][0] / 5),
 )
