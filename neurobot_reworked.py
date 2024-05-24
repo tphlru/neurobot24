@@ -112,7 +112,7 @@ bimg = bright_contrast(bimg, 5, 5)  # brightness and contrast
 
 
 img = heq(img)
-img = bright_contrast(img, 5, 10)  # brightness and contrast
+img = bright_contrast(img, 0, 5)  # brightness and contrast
 
 show(image)
 show(img)
@@ -164,7 +164,8 @@ mask_blue = mask_by_color(bimg, color_ranges['blue'])  # Shades of blue
 # Remove all the red-colored things from blue mask
 mask_blue = cv2.subtract(invert(mask_red), invert(mask_blue))
 # Close possible holes in the aims
-mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=2))
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=1))
+mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_CLOSE, kernel, iterations=3))
 
 # mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_OPEN, kernel, iterations=2))  # FIX
 mask_blue = (cv2.morphologyEx(mask_blue, cv2.MORPH_DILATE, kernel, iterations=2))
