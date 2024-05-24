@@ -24,7 +24,7 @@ import arduino
 
 workpath = ""
 
-arduino = arduino.Arduino(serport="/dev/ttyUSB0", baud=9600)
+arduino = arduino.Arduino(serport="COM4", baud=9600)
 arduino.init_arduino()
 
 coordinates = {"aim_center": []}
@@ -33,12 +33,12 @@ sizes = {}
 
 color_ranges = {
     "white": [(0, 0, 90), (255, 130, 255)],  # inscrease 130 here for better white detection
-    # "red": [[(0, 94, 68), (23, 255, 195)], [(160, 30, 68), (250, 255, 195)]],
-    # "red": [(0, 49, 75), (109, 255, 255)],
-    "red": [[(0, 161, 34), (23, 255, 255)], [(0, 161, 34), (250, 255, 255)]],
-    # "blue": [(34, 131, 49), (255, 255, 255)],
+    # "red": [[(0, 15, 94), (23, 124, 188)], [(160, 15, 94), (250, 124, 188)]],
+    "red": [(0, 26, 86), (60, 255, 255)],
+    # "red": [[(0, 161, 34), (23, 255, 255)], [(0, 161, 34), (250, 255, 255)]],
+    "blue": [(23, 49, 8), (255, 255, 255)],
     # "blue": [(30, 23, 49), (120, 154, 203)],
-    "blue": [(23, 49, 8), (105, 161, 161)],
+    # "blue": [(23, 49, 8), (105, 161, 161)],
     "black": [(0, 0, 0), (255, 255, 36)],
 }
 
@@ -76,7 +76,6 @@ def show(iimg, wd=400):
 
 
 # image = cv2.imread(workpath + "rect5.png")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
-
 
 # read frame from cam
 cam = cv2.VideoCapture(0)
@@ -725,5 +724,5 @@ arduino.set_xy(base_ang_x * 4, base_ang_y * 4)
 time.sleep(4)
 
 for i in relative_angs:
-    arduino.set_xy(i[0] * 4, i[1] * 4)
-    time.sleep(4)
+    if arduino.wait_for_btn():
+        arduino.set_xy(i[0] * 4, i[1] * 4)

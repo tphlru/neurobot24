@@ -36,6 +36,18 @@ class Arduino:
                 print("Failed, timeout!")
                 return False
 
+    def wait_for_btn(self, time_limit=60):
+        exit_count = 0
+        sleeptime = 0.25
+        print("Wait for btn ...")
+        while True:
+            exit_count += 1
+            if "btn" in read_arduino(self.arduino):
+                print("button click!")
+                return True
+            elif sleeptime * exit_count >= time_limit:
+                return False
+
     def set_xy(self, setx, sety):
         tosend = "x{x}y{y}e".format(x=str(round(setx)), y=str(round(sety)))
         send_arduino(self.arduino, tosend)

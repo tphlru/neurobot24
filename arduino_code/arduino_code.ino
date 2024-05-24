@@ -7,7 +7,7 @@ uint32_t servoTimer;
 uint32_t turnTimer;
 
 const float bx = 90;
-const float by = 90+8;
+const float by = 90 + 8;
 
 
 float deg_x = bx;
@@ -16,6 +16,8 @@ float deg_y = by;
 void setup() {
   Serial.begin(9600);
   pinMode(8, OUTPUT);
+  pinMode(13, OUTPUT);
+  pinMode(4, INPUT_PULLUP);
 
   servos[0].attach(9, bx);
   servos[0].smoothStart();
@@ -31,6 +33,10 @@ void setup() {
 
 void loop() {
   String got;
+  if (digitalRead(4) == LOW) {
+    Serial.println("btn");
+    delay(1500);
+  }
   if (Serial.available()) {
     got = Serial.readStringUntil('e');
     if (got.indexOf('s') >= 0) {
@@ -59,8 +65,9 @@ void loop() {
 
   if (ready_x == true and ready_y == true) {
     digitalWrite(8, HIGH);
-  }
-  else {
+    digitalWrite(13, HIGH);
+  } else {
     digitalWrite(8, LOW);
+    digitalWrite(13, LOW);
   }
 }
