@@ -6,8 +6,8 @@ import numpy as np
 from PIL import Image, ImageTk
 import cv2
 
-hmin, smin, vmin = 49, 34, 20
-hmax, smax, vmax = 120, 145, 205
+hmin, smin, vmin = 23, 49, 8
+hmax, smax, vmax = 105, 161, 161
 
 immmg = cv2.imread("rect4.png")
 
@@ -34,9 +34,9 @@ def heq(iimg):
     return np.stack((colorimage_b, colorimage_g, colorimage_r), axis=2)
 
 
-# immmg = frame
+immmg = frame
 
-immmg = heq(immmg)
+# immmg = heq(immmg)
 immmg = bright_contrast(immmg, 5, 5)  # brightness and contrast
 
 testset = [(0, 0, 0), (255, 255, 255)]
