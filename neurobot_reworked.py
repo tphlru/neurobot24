@@ -24,7 +24,7 @@ import arduino
 
 workpath = ""
 
-arduino = arduino.Arduino(serport="COM4", baud=9600)
+arduino = arduino.Arduino(serport="COM3", baud=9600)
 arduino.init_arduino()
 
 coordinates = {"aim_center": []}
@@ -34,9 +34,9 @@ sizes = {}
 color_ranges = {
     "white": [(0, 0, 90), (255, 130, 255)],  # inscrease 130 here for better white detection
     # "red": [[(0, 15, 94), (23, 124, 188)], [(160, 15, 94), (250, 124, 188)]],
-    "red": [(0, 26, 86), (60, 255, 255)],
-    # "red": [[(0, 161, 34), (23, 255, 255)], [(0, 161, 34), (250, 255, 255)]],
-    "blue": [(23, 49, 8), (255, 255, 255)],
+    # "red": [(0, 26, 86), (60, 255, 255)],
+    "red": [[(0, 49, 0), (23, 221, 236)], [(165, 49, 0), (255, 221, 236)]],
+    "blue": [(23, 49, 0), (139, 161, 161)],
     # "blue": [(30, 23, 49), (120, 154, 203)],
     # "blue": [(23, 49, 8), (105, 161, 161)],
     "black": [(0, 0, 0), (255, 255, 36)],
@@ -46,22 +46,22 @@ color_ranges = {
 planewidth = 1200
 planeheight = 800
 dist_to_plane = 2200  # стандартное?
-min_accur = 50
+min_accur = 35
 square_hcounts, square_wcounts = 4, 6
-size_plus = 150
-cross2squareK: float = 200 / 150  # 20 / 15
+size_plus = 120
+cross2squareK: float = 200 / 125  # 20 / 15
 square_cm = 20
 
 pix_k = 1
-floor_plus = 58.5  # real (in cm) distance between the floor (laser level) and plus
-floor_bottom = 58.5  # real (in cm) distance between the floor (laser level) and bottom of the plane
+floor_plus = 29  # real (in cm) distance between the floor (laser level) and plus
+floor_bottom = 29  # real (in cm) distance between the floor (laser level) and bottom of the plane
 
-try:
-    cal_k = float(
-        inputimeout("Enter CAL_K value: ", timeout=2) or "15402.0" if not (environ.get('CAL_K')) else environ.get(
-            'CAL_K'))  # 1.0
-except TimeoutOccurred:
-    cal_k = 15402.0
+# try:
+#     cal_k = float(
+#         inputimeout("Enter CAL_K value: ", timeout=1) or "12400.0" if not (environ.get('CAL_K')) else environ.get(
+#             'CAL_K'))  # 1.0
+# except TimeoutOccurred:
+cal_k = 11550
 
 
 def show(iimg, wd=400):
@@ -78,7 +78,7 @@ def show(iimg, wd=400):
 # image = cv2.imread(workpath + "rect5.png")  # 1223.jpg 4438.jpg photo4.jpg rect4.png
 
 # read frame from cam
-cam = cv2.VideoCapture(0)
+cam = cv2.VideoCapture("rtsp://127.0.0.1:9192/h264_pcm.sdp")
 # set cam params
 cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -110,8 +110,8 @@ bimg = bright_contrast(bimg, 5, 5)  # brightness and contrast
 # bimg = heq(bimg)
 
 
-img = heq(img)
-img = bright_contrast(img, 0, 5)  # brightness and contrast
+# img = heq(img)
+img = bright_contrast(img, 5, 5)  # brightness and contrast
 
 show(image)
 show(img)
@@ -144,7 +144,7 @@ mask_white = mask_by_color(img, color_ranges['white'])  # Shades of white (and i
 mask_red = mask_by_color(img, color_ranges['red'])  # Shades of red and pink
 mask_red = np.where(center_mask == 0, 0, mask_red)  # apply the center mask
 mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_DILATE, kernel, iterations=1))
-mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=2))
+mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel, iterations=1))
 mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_CLOSE, kernel, iterations=3))
 mask_red = (cv2.morphologyEx(mask_red, cv2.MORPH_DILATE, kernel, iterations=2))
 
@@ -213,7 +213,8 @@ show(cop, 600)
 
 # Init cascade
 cascade = cv2.CascadeClassifier()
-cascade.load(workpath + "cascade2.xml")  # load cascade
+cascade.load(
+    """C:/Users/class144.SCHOOL/Desktop/latest/neurobot24-main(1)/neurobot24-main/""" + "cascade2.xml")  # load cascade
 
 # Crop black borders
 y_nonzero, x_nonzero = np.nonzero(mask_red)
@@ -222,20 +223,28 @@ mask_red_detectable = (mask_red[np.min(y_nonzero):np.max(y_nonzero), np.min(x_no
 # Detect cross using cascade
 # detected_cross = cascade.detectMultiScale(
 #     invert(mask_red_detectable),  # for some reason, it detects black, not white
-#     scaleFactor=1.03,
-#     minNeighbors=16,
-#     minSize=(60, 60),
-#     maxSize=(175, 175),
+#     scaleFactor=1.08,
+#     minNeighbors=8,
+#     minSize=(20, 20),
+#     maxSize=(255, 255),
 # )
 
-detected_cross = cascade.detectMultiScale(
-    invert(mask_red_detectable),  # for some reason, it detects black, not white
-    scaleFactor=1.1,
-    minNeighbors=8,
-    minSize=(30, 30),
-    maxSize=(220, 220),
-)
+detected_cross = []
 
+for ifactor in range(1, 200):
+    for inei in range(1, 22):
+        detected_cross = cascade.detectMultiScale(
+            invert(mask_red_detectable),  # for some reason, it detects black, not white
+            scaleFactor=float(float(ifactor / 1000) + 1),
+            minNeighbors=inei,
+            minSize=(20, 20),
+            maxSize=(350, 350),
+        )
+        print("factor =", str(float(ifactor)), "imei =", inei, "detected", len(detected_cross))
+        if 6 > len(detected_cross) >= 1:
+            break
+    if 6 > len(detected_cross) >= 1:
+        break
 print(f"Found {len(detected_cross)} objects using haar cascade!")
 
 haar_rect = {"mindist": 0, "center": (0, 0), "wh": (0, 0)}
@@ -243,7 +252,7 @@ detects = []
 
 # Iterate over each of detected rect zones
 for detect, (dX, dY, dW, dH) in enumerate(detected_cross):
-    plus_center = (dX + dW // 2, dY + dH // 2)  # Calculate the center of the rectangle
+    plus_center = (dX + dW / 2, dY + dH // 2)  # Calculate the center of the rectangle
 
     # Check if new center is closer to the real center than previous one
     distance = sqrt(plus_center[0] ** 2 + plus_center[1] ** 2)
@@ -358,8 +367,8 @@ for detect in detects:
     # result = cv2.pointPolygonTest(contour, (x,y), False)
     # Обходим каждый контур
     for cnt in cnts_info:
-        cntRx = range(round(cnt['x'] - (cnt['rW'] / 2)), round(cnt['x'] + (cnt['rW'] / 2)))
-        cntRy = range(round(cnt['y'] - (cnt['rH'] / 2)), round(cnt['y'] + (cnt['rH'] / 2)))
+        cntRx = range(round(cnt['x']), round(cnt['x'] + (cnt['rW'] / 2)))
+        cntRy = range(round(cnt['y']), round(cnt['y'] + (cnt['rH'] / 2)))
         if set(cntRx).issubset(rX) and set(cntRy).issubset(rY):
             print("This's our case!", cnt['i'])
             if len(cnts_info) > 1:
@@ -410,13 +419,16 @@ if not any(perfects):
     perfects.append(temp_perfect)
     perfect_ranges.append(temp_perfect_range)
 
+if not any(temp_perfect):
+    perfects.append(cnts_info[0])
+
 pprint(perfects)
 for ii in perfects:
     cv2.drawContours(img, [contours[ii['i']]], -1, (0, 255, 0), 2)
 print(f"Found {len(perfects)} perfect(s)!")
 pprint(perfects)
-perfect = perfects[-1]
-perfect_range = perfect_ranges[-1]
+perfect = perfects[0]
+perfect_range = perfect_ranges[0]
 
 # sizes["plus"] = [perfect['rW'], perfect['rH']]  # save width and height
 
@@ -431,7 +443,7 @@ print("Height of the plus: ", sizes["plus"][1])
 pix_k = size_plus / ((sizes["plus"][0] + sizes["plus"][1]) / 2)
 print("cm in 1 pix (pix_k): ", pix_k)
 
-if "y" in input("Калибровать y/n"):
+if False:
     dist_to_cal = float(input("Введите расстояние до калибровачной плокости в см, в формате xx.x"))
     cal_k = ((sizes["plus"][0] + sizes["plus"][1]) / 2) * dist_to_cal
     print("Калибровачный коэффицент =", cal_k)
@@ -518,12 +530,12 @@ show(mask_blue, 500)
 circles = cv2.HoughCircles(
     mask_blue,
     cv2.HOUGH_GRADIENT,
-    1.25,
-    sizes["square"][0] // 3,
+    1.1,
+    sizes["square"][0] // 5,
     param1=900,
     param2=5,
-    minRadius=round(sizes["square"][0] / 8),
-    maxRadius=round(sizes["square"][0] / 5),
+    minRadius=round(sizes["square"][0] / 8.5),
+    maxRadius=round(sizes["square"][0] / 5.5),
 )
 print("Circles: ", circles)
 
@@ -718,11 +730,12 @@ print(ang_x_vals)
 relative_angs = [[ang_x_vals[i], ang_y_vals[i]] for i in range(len(matrix_coords))]
 print(relative_angs)
 
-time.sleep(1)
+# time.sleep(1)
 
-arduino.set_xy(base_ang_x * 4, base_ang_y * 4)
-time.sleep(4)
+# arduino.set_xy(base_ang_x * 4, base_ang_y * 4)
+time.sleep(3)
 
 for i in relative_angs:
     if arduino.wait_for_btn():
+        time.sleep(3)
         arduino.set_xy(i[0] * 4, i[1] * 4)
